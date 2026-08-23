@@ -42,9 +42,11 @@ PATHLIKE_RE = re.compile(r"(^|[\s\"'])(/[\w.-]+){2,}|([A-Za-z]:\\\\)")
 RECEIVED_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}")
 
 
+_FAILURES: list[str] = []
+
+
 def fail(msg: str) -> None:
-    print(f"VALIDATION FAIL: {msg}")
-    sys.exit(1)
+    _FAILURES.append(msg)
 
 
 def main() -> int:
@@ -105,17 +107,28 @@ def main() -> int:
             fail(f"{f}: email-shaped string present")
         if PATHLIKE_RE.search(text):
             fail(f"{f}: path-like string present")
+
         def walk(node, prefix=""):
             if isinstance(node, dict):
                 for k, v in node.items():
                     if k in FORBIDDEN_KEYS:
                         fail(f"{f}: forbidden key {k!r} at {prefix}")
-                    walk(v, f"{prefix}.{k}")
+                    walk(v, f"{prefix}.{k}" if prefix else k)
+            elif isinstance(node, list):
+                for i, item in enumerate(node):
+                    walk(item, f"{prefix}[{i}]")
+
         walk(payload)
-        print(f"OK {f} (door={manifest[sub_id]['door']})")
+        if not _FAILURES:
+            print(f"OK {f} (door={manifest[sub_id]['door']})")
     print(f"validated {len(payloads)} payload(s)")
     return 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    code = main()
+    if _FAILURES:
+        for message in _FAILURES:
+            print(f"VALIDATION FAIL: {message}")
+        sys.exit(1)
+    raise SystemExit(code)
