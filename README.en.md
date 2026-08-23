@@ -1,4 +1,4 @@
-# grift-contributions — TEP Report / opt-in contribution intake
+# tep-contributions — TEP Report / opt-in contribution intake (two doors, one corpus)
 
 **[日本語](README.md) | English**
 
@@ -6,43 +6,64 @@
 
 This public repository receives opt-in contribution payloads built by
 `grift contribute`. Submission is entirely voluntary; the CLI never sends
-anything — you review the payload and open the PR yourself.
+anything. **Intake has two doors; storage is a single public corpus:**
 
-## How to submit
+- **Public door (door: pr)**: you submit the payload as a PR yourself
+  (optional credit via the `attribution` field)
+- **Private door (door: private)**: after receiving your form/email
+  submission, we open the PR on your behalf with a `door: private` manifest
+  label (**your identity stays private**)
+
+Both doors pass the same schema validation and land in the same corpus.
+
+## Purpose restriction
+
+**Submitted data is used solely for "TEP Report aggregation and the next
+reference distribution."** In particular, **reuse for channel 4 (Grift SaaS /
+organization contracts) is forbidden**, including sales, estimation, and
+business development use.
+
+## Retention & withdrawal
+
+- Retained until the next annual Report
+- Withdrawal: (a) open a PR deleting your payload, or (b) contact the address
+  at the bottom of this README (identities from the private door stay private)
+
+## Submitting via the public door
 
 ```bash
-# 1. Create a repo-scope report in the target repository
-grift report                      # → .grift/report.{json,md}
-
-# 2. Build the payload (the full text is printed and the flow states that
-#    "this submission will appear in a public repository")
-grift contribute --out .grift/contribution.json
-
-# 3. Review the payload, then open a PR to this repository
-#    File name: contributions/YYYY/MMDD-HHMM-<hash8>.json
-#    (e.g. contributions/2026/0823-1415-a1b2c3d4.json)
-#    The payload never contains repo names, emails, canonical_ids, or paths.
+grift report                                     # 1) create a repo-scope report
+grift contribute --out .grift/contribution.json  # 2) build & review the payload
+# 3) PR the payload unchanged:
+#    file: payloads/2026/<submission-id>.json
+#    append one manifest.jsonl line: {"id":"...","sha256":"...","received_at":"...","door":"pr"}
+#    optional credit: an `attribution` display name inside the payload (opt-in)
 ```
 
-## Accepted / not accepted
+## The private door
 
-**Accepted**: repo-scope aggregate values + context_profile (class-level
-fields) + definition versions — a single `tep-contribution-v1` JSON file.
+Attach the payload file to the form (or the contact email below). We open the
+PR on your behalf with `door: "private"` in the manifest. **Since you never
+open the PR, your GitHub identity is never linked to the submission.**
 
-**Never included (excluded by rule)**: canonical_id, actors, emails, paths,
-repo name (unless you choose to add it), tenant-scope values.
+## Mechanically enforced acceptance
 
-## How submissions are used
+CI runs on every PR (PRs containing identifying information **fail**):
 
-- Use is limited to "TEP Report aggregation and the next reference
-  distribution" — nothing else
-- Retained until the next annual Report; withdrawal accepted via issue (or
-  a revert PR)
-- See the retention section of the
-  [grift-cli norms](https://github.com/Cor-Incorporated/grift-cli/blob/main/docs/norms.md)
+- payload schema validation (`tep-contribution-v1`, repo scope only)
+- **needle sweep**: email-shaped strings, `actors` arrays, paths, repo-name
+  fields, any `@` character
 
-## Review
+**Never included**: canonical_id, actors, emails, paths, repo names (except
+opt-in `attribution`), tenant-scope values.
 
-- Schema validation (`tep-contribution-v1`) is performed mechanically
-- **PRs containing personally identifiable content or off-schema data are rejected**
-- Inclusion in distributions follows the existing rules (MIN_N ≥ 30, immutable versioning)
+## Inclusion in distributions
+
+Follows the existing rules (MIN_N ≥ 30, immutable versioning).
+
+---
+
+## Contact (private door / withdrawals)
+
+- Withdrawals & private submissions: `contributions@cor-incorporated.example`
+- Questions: issues on this repository (Japanese / English)

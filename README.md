@@ -1,43 +1,57 @@
-# grift-contributions — TEP Report / 参照分布への opt-in 提出 int TEP Report / opt-in contribution intake
+# tep-contributions — TEP Report / 参照分布への opt-in 提出 int TEP Report / opt-in contribution intake（二枚扉・一つの公開コーパス）
 
 **日本語 | [English](README.en.md)**
 
 ## これは何か（What this is）
 
-`grift contribute` で組み立てた提出 payload を受け付ける公開リポジトリです。提出は **完全に任意（opt-in）** で、CLI は何も送信しません — あなたが payload を確認し、ご自身で PR を出すことで初めて提出になります。
+`grift contribute` で組み立てた提出 payload を受け付ける公開リポジトリです。提出は**完全に任意（opt-in）**で、CLI は何も送信しません。**受け取りは二枚扉・保管は一つの公開コーパス**です:
 
-This public repository receives opt-in contribution payloads built by
-`grift contribute`. Submission is entirely voluntary; the CLI never sends
-anything — you review the payload and open the PR yourself.
+- **公開ドア（door: pr）**: ご自身で payload を PR として提出（希望者のみ `attribution` フィールドでクレジット表記可）
+- **非公開ドア（door: private）**: フォームまたはメールで受領後、当社が代理で PR を開き `door: private` ラベルを付与（**提出者の身元は非公開のまま**）
 
-## 提出の流れ（How to submit）
+どちらのドアも payload は同じスキーマ検証を通り、同一コーパスに保管されます。
+
+## 目的拘束 / Purpose restriction
+
+**提出データの用途は「TEP Report 集計と参照分布 vNext」に限定されます。それ以外の目的には使いません。**
+特に **チャネル4（Grift SaaS・組織契約）への転用を禁止します**（販売・見積もり・営業への流用を含む）。
+
+## 保持期間と撤回 / Retention & withdrawal
+
+- 保持期間は**次回年次 Report の発行まで**
+- 撤回方法: (a) ご自身の payload を削除する PR を出す (b) README 末尾の連絡先へ依頼（非公開ドア経由の身元は依頼時も開示されません）
+
+## 提出の流れ（公開ドア / How to submit via the public door）
 
 ```bash
-# 1. 対象リポジトリで repo スコープの report を作る
-grift report                      # → .grift/report.{json,md}
-
-# 2. payload を組む（全文が表示され、「この提出は公開リポジトリに載る」ことが明示されます）
-grift contribute --out .grift/contribution.json
-
-# 3. payload を確認して、このリポジトリに PR を出す
-#    ファイル名: contributions/YYYY/MMDD-HHMM-<hash8>.json（例: contributions/2026/0823-1415-a1b2c3d4.json）
-#    ※ payload に repo 名・メール・canonical_id は含まれません
+grift report                                     # ① repo スコープの report を作る
+grift contribute --out .grift/contribution.json  # ② payload を組み・全文を確認
+# ③ payload をそのまま PR に出す:
+#    ファイル: payloads/2026/<submission-id>.json
+#    manifest.jsonl に1行追記: {"id":"...","sha256":"...","received_at":"...","door":"pr"}
+#    attribution を付ける場合は payload の attribution フィールドに任意の表示名（任意・opt-in）
 ```
 
-## 受け付けられるもの / ならないもの（Accepted / not accepted）
+## 非公開ドア（私的提出 / private door）
 
-**受け付けられる**: repo スコープの集計値 + context_profile（クラス級）+ 定義版。`tep-contribution-v1` スキーマの JSON 1 ファイル。
+フォーム（準備中の場合は下記連絡先メール）へ payload ファイルを添付して送付してください。受領後、当社が代理で PR を開き manifest の `door` を `private` とします。**あなたが PR を開かないため、提出者と GitHub アカウントの紐付けは生じません。**
 
-**含まれていない（規則で排除）**: canonical_id・actors・メール・パス・repo 名（提出者が付記を選ばない限り）・tenant スコープ値。
+## 受け付け基準（機械検証 / Mechanically enforced）
 
-## 提出されたデータの扱い（How submissions are used）
+CI が各 PR に対して実行します（識別情報を含む PR は**機械的に fail**）:
 
-- **用途は「TEP Report 集計と参照分布 vNext」に限定**されます（それ以外には使いません）
-- 保持期間は次回年次 Report の発行まで。撤回は issue で受け付けます（PR の revert でも構いません）
-- 詳細は [grift-cli の norms](https://github.com/Cor-Incorporated/grift-cli/blob/main/docs/norms.md) の保持・削除条項
+- payload スキーマ検証（`tep-contribution-v1`・repo スコープのみ）
+- **needle sweep**: メール形式の文字列・`actors` 配列・パス・repo 名フィールド・`@` を含む一切の文字列
 
-## 審査について（Review）
+**含まれていない（規則で排除）**: canonical_id・actors・メール・パス・repo 名（`attribution` フィールドへの任意付記を除く）・tenant スコープ値。
 
-- スキーマ検証（`tep-contribution-v1`）を機械的に行います
-- **個人が特定できる内容・スキーマ外のデータを含む PR は却下します**
-- 分布への算入は MIN_N（n≥30）・immutable 版管理の既存規則に従います
+## 分布への算入
+
+MIN_N（n≥30）・immutable 版管理の既存規則に従います。
+
+---
+
+## 連絡先（非公開ドア・撤回依頼 / Contact）
+
+- 撤回・非公開提出: `contributions@cor-incorporated.example`（メール）
+- 質問: このリポジトリの issue（日本語 / English）

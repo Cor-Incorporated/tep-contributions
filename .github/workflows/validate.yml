@@ -2,22 +2,48 @@ name: validate-contribution
 
 on:
   pull_request:
-    paths:
-      - "contributions/**"
+  push:
+    branches: [main]
 
 jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Validate contribution payloads (schema + no-private rails)
+      - name: Payload schema + manifest + needle sweep
         run: python scripts/validate.py
-      - name: Reject email-shaped content
+      - name: Falsification self-test (identifying payload MUST fail)
         run: |
-          if git grep -nE "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}" -- contributions/; then
-            echo "::error::email-shaped string found in contributions/"
+          set -e
+          mkdir -p /tmp/neg/payloads/2026
+          python3 - << 'EOF'
+          import json, hashlib, pathlib
+          bad = {
+            "contribution_schema": "tep-contribution-v1",
+            "purpose": "TEP Report 集計と参照分布 vNext",
+            "provenance": {"tool_name": "grift", "tool_version": "0.5.5",
+                           "definition_version": "x", "origin_definition_version": "x",
+                           "activity_definition_version": "x", "analysis_scope": "repo"},
+            "metrics": {"leak": {"email": "someone@example.com"}},
+            "context_profile": {},
+          }
+          p = pathlib.Path("/tmp/neg/payloads/2026/9999-leak.json")
+          p.write_text(json.dumps(bad, ensure_ascii=False), encoding="utf-8")
+          d = hashlib.sha256(p.read_text(encoding="utf-8").encode()).hexdigest()
+          pathlib.Path("/tmp/neg/manifest.jsonl").write_text(
+            json.dumps({"id": "9999-leak", "sha256": d,
+                        "received_at": "2026-08-23T00:00:00Z", "door": "pr"}) + "\n",
+            encoding="utf-8")
+          EOF
+          if (cd /tmp/neg && python3 "$GITHUB_WORKSPACE/scripts/validate.py" > /tmp/neg/out.txt 2>&1); then
+            echo "::error::validator accepted an identifying payload — falsification failed"
+            cat /tmp/neg/out.txt
             exit 1
           fi
+          echo "falsification OK: identifying payload rejected:"
+          cat /tmp/neg/out.txt
