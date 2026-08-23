@@ -25,7 +25,11 @@ business development use.
 
 ## Retention & withdrawal
 
-- Retained until the next annual Report
+- **The retention period (until the next annual Report) applies to the
+  private door's identity records**
+- **Payloads (the public corpus) are retained indefinitely unless withdrawn** —
+  they stay public so third parties can recompute the reference distributions
+  (verifiability)
 - Withdrawal: (a) open a PR deleting your payload, or (b) contact the address
   at the bottom of this README (identities from the private door stay private)
 
@@ -65,5 +69,5 @@ Follows the existing rules (MIN_N ≥ 30, immutable versioning).
 
 ## Contact (private door / withdrawals)
 
-- Withdrawals & private submissions: `contributions@cor-incorporated.example`
+- Withdrawals & private submissions: `company@cor-jp.com`
 - Questions: issues on this repository (Japanese / English)

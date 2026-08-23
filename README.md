@@ -18,7 +18,8 @@
 
 ## 保持期間と撤回 / Retention & withdrawal
 
-- 保持期間は**次回年次 Report の発行まで**
+- **保持期間（次回年次 Report の発行まで）は非公開ドアの身元記録に適用されます**
+- **payload（公開コーパス）は撤回されない限り恒久保持されます** — 参照分布の第三者再計算（検証可能性）のために公開を維持します
 - 撤回方法: (a) ご自身の payload を削除する PR を出す (b) README 末尾の連絡先へ依頼（非公開ドア経由の身元は依頼時も開示されません）
 
 ## 提出の流れ（公開ドア / How to submit via the public door）
@@ -53,5 +54,5 @@ MIN_N（n≥30）・immutable 版管理の既存規則に従います。
 
 ## 連絡先（非公開ドア・撤回依頼 / Contact）
 
-- 撤回・非公開提出: `contributions@cor-incorporated.example`（メール）
+- 撤回・非公開提出: `company@cor-jp.com`（メール）
 - 質問: このリポジトリの issue（日本語 / English）
