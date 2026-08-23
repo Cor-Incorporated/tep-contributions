@@ -1,0 +1,52 @@
+{
+ "contribution_schema": "tep-contribution-v1",
+ "purpose": "TEP Report 集計と参照分布 vNext",
+ "provenance": {
+  "tool_name": "grift",
+  "tool_version": "0.5.5",
+  "definition_version": "tep-v0.5.5-2026-08-23",
+  "origin_definition_version": "origin-v1.1-2026-08-22",
+  "activity_definition_version": "activity-v1-2026-08-16",
+  "analysis_scope": "repo"
+ },
+ "metrics": {
+  "test_cochange": {
+   "kind": "observed",
+   "all_time": {
+    "kind": "observed",
+    "value": 0.1829,
+    "unit": "ratio",
+    "population": 246,
+    "cochanged": 45,
+    "narrate_rate": true
+   }
+  },
+  "origin": {
+   "unresolved": {
+    "kind": "observed",
+    "value": 377,
+    "unit": "commits"
+   }
+  }
+ },
+ "context_profile": {
+  "kind": "observed",
+  "definition_version": "context-v2-2026-08-23",
+  "analysis_scope": "repo",
+  "collaboration_class": {
+   "kind": "observed",
+   "value": "community",
+   "unit": "class"
+  },
+  "lifecycle_stage": {
+   "kind": "observed",
+   "value": "maintained",
+   "unit": "class"
+  },
+  "active_days_180d": {
+   "kind": "observed",
+   "value": 4,
+   "unit": "days"
+  }
+ }
+}
