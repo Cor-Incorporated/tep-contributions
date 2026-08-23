@@ -1,0 +1,23 @@
+name: validate-contribution
+
+on:
+  pull_request:
+    paths:
+      - "contributions/**"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate contribution payloads (schema + no-private rails)
+        run: python scripts/validate.py
+      - name: Reject email-shaped content
+        run: |
+          if git grep -nE "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}" -- contributions/; then
+            echo "::error::email-shaped string found in contributions/"
+            exit 1
+          fi
