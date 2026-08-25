@@ -50,28 +50,42 @@ def fail(msg: str) -> None:
 
 
 def main() -> int:
-    payloads = sorted(Path("payloads").rglob("*.json"))
+    # C (2026-08-25): PRs add payloads/<year>/<id>.json + <id>.meta.json only.
+    # manifest.jsonl is GENERATED on main by CI from the meta files — parallel
+    # PRs never conflict on a shared append target.
+    payloads = sorted(p for p in Path("payloads").rglob("*.json") if not p.name.endswith(".meta.json"))
     if not payloads:
         fail("no payload JSON found under payloads/")
-    manifest_path = Path("manifest.jsonl")
-    if not manifest_path.is_file():
-        fail("manifest.jsonl missing")
     manifest = {}
-    for lineno, line in enumerate(manifest_path.read_text(encoding="utf-8").splitlines(), 1):
-        if not line.strip():
-            continue
+    for f in payloads:
+        meta_path = f.parent / f"{f.stem}.meta.json"
+        if not meta_path.is_file():
+            fail(f"{f}: missing sidecar {f.stem}.meta.json")
         try:
-            row = json.loads(line)
+            row = json.loads(meta_path.read_text(encoding="utf-8"))
         except json.JSONDecodeError as exc:
-            fail(f"manifest.jsonl:{lineno}: invalid JSON ({exc})")
+            fail(f"{meta_path}: invalid JSON ({exc})")
         for key in ("id", "sha256", "received_at", "door"):
             if key not in row:
-                fail(f"manifest.jsonl:{lineno}: missing {key}")
+                fail(f"{meta_path}: missing {key}")
         if row["door"] not in ("pr", "private"):
-            fail(f"manifest.jsonl:{lineno}: door must be 'pr' or 'private'")
+            fail(f"{meta_path}: door must be 'pr' or 'private'")
         if not RECEIVED_RE.match(str(row["received_at"])):
-            fail(f"manifest.jsonl:{lineno}: received_at must be ISO datetime")
+            fail(f"{meta_path}: received_at must be ISO datetime")
         manifest[row["id"]] = row
+    # stale legacy manifest.jsonl (if present) must not contain ids missing
+    # from the meta files — regeneration drift is itself a failure
+    legacy = Path("manifest.jsonl")
+    if legacy.is_file():
+        for lineno, line in enumerate(legacy.read_text(encoding="utf-8").splitlines(), 1):
+            if not line.strip():
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError as exc:
+                fail(f"manifest.jsonl:{lineno}: invalid JSON ({exc}) — regenerate on main")
+            if row.get("id") not in manifest:
+                fail(f"manifest.jsonl:{lineno}: id {row.get('id')!r} has no payload/meta; regenerate on main")
 
     for f in payloads:
         raw = f.read_text(encoding="utf-8")

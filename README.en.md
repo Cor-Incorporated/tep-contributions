@@ -40,7 +40,7 @@ grift report                                     # 1) create a repo-scope report
 grift contribute --out .grift/contribution.json  # 2) build & review the payload
 # 3) PR the payload unchanged:
 #    file: payloads/2026/<submission-id>.json
-#    append one manifest.jsonl line: {"id":"...","sha256":"...","received_at":"...","door":"pr"}
+#    add a sidecar <id>.meta.json in the same directory (manifest.jsonl is generated on main — do not edit): {"id":"...","sha256":"...","received_at":"...","door":"pr"}
 #    optional credit: an `attribution` display name inside the payload (opt-in)
 ```
 
