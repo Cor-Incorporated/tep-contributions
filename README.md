@@ -44,6 +44,8 @@ CI が各 PR に対して実行します（識別情報を含む PR は**機械�
 - payload スキーマ検証（`tep-contribution-v1`・repo スコープのみ）
 - **needle sweep**: メール形式の文字列・`actors` 配列・パス・repo 名フィールド・`@` を含む一切の文字列
 
+**含まれている（注明つき）**: `metrics.provenance.analyzed_commit_sha`（分析時点のコミット SHA）と `analyzed_at`（分析時刻）。**SHA は中身を復元できない不透明値ですが、公開 repo では対象の特定に使えます**（特徴の組合せから推測されるリスクと同旨の開示です）。
+
 **含まれていない（規則で排除）**: canonical_id・actors・メール・パス・repo 名（`attribution` フィールドへの任意付記を除く）・tenant スコープ値。
 
 ## 分布への算入
