@@ -58,6 +58,11 @@ CI runs on every PR (PRs containing identifying information **fail**):
 - **needle sweep**: email-shaped strings, `actors` arrays, paths, repo-name
   fields, any `@` character
 
+**Included (with a note)**: `metrics.provenance.analyzed_commit_sha` (the
+commit SHA at analysis time) and `analyzed_at`. **The SHA is opaque — it
+cannot restore content — but for public repositories it can identify the
+target** (same caveat as the feature-combination re-identification risk).
+
 **Never included**: canonical_id, actors, emails, paths, repo names (except
 opt-in `attribution`), tenant-scope values.
 
