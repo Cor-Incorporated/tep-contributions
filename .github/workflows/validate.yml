@@ -127,7 +127,7 @@ jobs:
             cp /tmp/v2t/payloads/2026/$positive.json /tmp/v2p/payloads/2026/
             cp /tmp/v2t/payloads/2026/$positive.meta.json /tmp/v2p/payloads/2026/
             grep "\"$positive\"" /tmp/v2t/all-meta.jsonl > /tmp/v2p/manifest.jsonl
-            if python3 "$GITHUB_WORKSPACE/scripts/validate.py" > "/tmp/v2p/$positive.txt" 2>&1; then
+            if (cd /tmp/v2p && python3 "$GITHUB_WORKSPACE/scripts/validate.py" > "/tmp/v2p/$positive.txt" 2>&1); then
               echo "v2 positive accepted: $positive"
             else
               echo "::error::validator rejected valid v2 public payload $positive"
@@ -139,7 +139,7 @@ jobs:
             cp /tmp/v2t/payloads/2026/$must_fail.json /tmp/v2n/payloads/2026/
             cp /tmp/v2t/payloads/2026/$must_fail.meta.json /tmp/v2n/payloads/2026/
             grep "\"$must_fail\"" /tmp/v2t/all-meta.jsonl > /tmp/v2n/manifest.jsonl
-            if python3 "$GITHUB_WORKSPACE/scripts/validate.py" > "/tmp/v2n/$must_fail.txt" 2>&1; then
+            if (cd /tmp/v2n && python3 "$GITHUB_WORKSPACE/scripts/validate.py" > "/tmp/v2n/$must_fail.txt" 2>&1); then
               echo "::error::validator accepted forbidden v2 payload $must_fail — falsification failed"
               cat "/tmp/v2n/$must_fail.txt"; exit 1
             fi
