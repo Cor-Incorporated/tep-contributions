@@ -24,8 +24,8 @@ public intake accepts only the two public ones**:
 
 | profile | accepted here | retained information |
 |---|---|---|
-| `aggregate` | yes (both doors) | bucketed aggregates, n, denominators, coverage, missingness, random receipt id. No actor rows, repo/remote/OIDs, timestamps, source digests |
-| `named-public` | yes (both doors) | provider-neutral public project/account references and the author's actor observations. No raw emails, internal actor ids, or pseudonyms |
+| `aggregate` | yes (both doors) | bucketed aggregates, n, denominators, coverage, missingness, random receipt id. No actor rows, repo/remote/OIDs, timestamps, source digests. The public payload alone cannot replay or deduplicate the source |
+| `named-public` | yes (both doors) | provider-neutral public project/account references and the author's actor observations. Requires explicit account-holder authority bound to the project and account, provider commit-account evidence, and coverage. No raw emails, internal actor ids, or pseudonyms |
 | `masked` | **no (hard error)** | high-fidelity observations with HMAC pseudonyms; requires a controlled-study sidecar |
 | `raw` | **no (hard error)** | raw names/emails/OIDs; research-controlled path only |
 
@@ -81,6 +81,12 @@ CI runs on every PR (PRs containing identifying information **fail**):
 - payload schema validation (`tep-contribution-v1` or the public profiles of
   `tep-contribution-v2`, repo scope only; v2 accepts `aggregate` and
   `named-public` only)
+- profile-specific v2 transformation digests and source-replay contracts
+  (`aggregate=unavailable_from_public_payload`,
+  `named-public=public_api_recollect_required`)
+- `named-public` currently accepts one stable account on one project and
+  cross-checks closed `account_holder_explicit` / `project_and_account`
+  authority, evidence, coverage, and actor buckets
 - **needle sweep**: email-shaped strings, v1 `actors` arrays, paths,
   repo-name fields, any `@` character, git-OID-shaped (40/64 hex) strings
 - v2 `named-public` URL/account references are limited to the closed
@@ -96,6 +102,12 @@ The v2 `aggregate` profile does not carry this SHA.
 **Never included**: canonical_id, actors (v1), emails, paths, repo names
 (except opt-in `attribution`), tenant-scope values; for v2 additionally any
 git OID.
+
+An `aggregate` public payload cannot replay its source and is not sufficient
+on its own to establish a reference distribution. `named-public` still
+requires public-API recollection and coverage checks. CI validates the closed
+receiver schema, fixtures emitted by the real CLI producer, and a
+known-accident mutation ledger together.
 
 ## Inclusion in distributions
 

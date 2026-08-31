@@ -15,7 +15,7 @@ except ModuleNotFoundError:
     import validate as validator  # type: ignore[no-redef]
 
 
-REAL_DIGEST = "sha256:42eb35f299c3d97490b459c590279b5a28e0790c393a6ac075f21e89e6b8f502"
+NAMED_DIGEST = "sha256:d6f759617a832b2ca7bf4a12e7808d44ca6e5d38ab9b2f406048e3e5bb207baa"
 
 
 def named_payload() -> dict[str, object]:
@@ -25,11 +25,11 @@ def named_payload() -> dict[str, object]:
         "door": "public-pr",
         "purpose": "TEP Report 集計と参照分布 vNext",
         "provenance_receipt_id": "receipt_abcdefghijklmnopqrstuvwxyz",
-        "transformation_spec_digest": REAL_DIGEST,
+        "transformation_spec_digest": NAMED_DIGEST,
         "policy": {
             "access_class": "public",
             "public_payload": True,
-            "source_replay": "controlled_sidecar_required",
+            "source_replay": "public_api_recollect_required",
         },
         "data": {
             "project": {
@@ -39,9 +39,17 @@ def named_payload() -> dict[str, object]:
                 "project_path": "example/project",
             },
             "authority": {
-                "basis": "provider-public-api",
-                "scope": "account",
-                "assertion": "stable numeric account id",
+                "accounts": [
+                    {
+                        "provider": "github",
+                        "host": "github.com",
+                        "project_id": "123456789",
+                        "account_id": "12345678",
+                        "basis": "account_holder_explicit",
+                        "scope": "project_and_account",
+                        "assertion": "authorized_for_public_research_contribution",
+                    }
+                ]
             },
             "actors": [
                 {
@@ -51,8 +59,20 @@ def named_payload() -> dict[str, object]:
                         "account_id": "12345678",
                         "handle": "example-handle",
                         "profile_url": "https://github.com/example-handle",
+                        "evidence": {
+                            "basis": "commit.author.id",
+                            "coverage_status": "complete",
+                            "account_match_status": "linked",
+                        },
                     },
-                    "measurements": {"commit_count_bucket": "20-99"},
+                    "measurements": {
+                        "linked_commit_count_bucket": "20-99",
+                        "actor_commit_count_bucket": "20-99",
+                        "linkage_coverage_bucket": "90-100%",
+                        "commit_count_basis": (
+                            "git_primary_author_cluster_including_merges"
+                        ),
+                    },
                 }
             ],
             "measurements": {"attribution": {"commit_count_bucket": "20-99"}},
@@ -96,7 +116,9 @@ def _known_accidents() -> list[tuple[str, Callable[[], list[str]]]]:
         checks.append((name, lambda payload=payload: _payload_failures(payload)))
 
     credential_text = named_payload()
-    credential_text["data"]["authority"]["assertion"] = "access%255Ftoken%3Dopaque"
+    credential_text["data"]["authority"]["accounts"][0]["assertion"] = (
+        "access%255Ftoken%3Dopaque"
+    )
     checks.append(
         (
             "encoded-credential-parameter",
@@ -115,6 +137,60 @@ def _known_accidents() -> list[tuple[str, Callable[[], list[str]]]]:
             ),
         )
     )
+    for name, mutate in (
+        (
+            "wrong-profile-digest",
+            lambda payload: payload.update(
+                {"transformation_spec_digest": "sha256:" + "0" * 64}
+            ),
+        ),
+        (
+            "wrong-source-replay",
+            lambda payload: payload["policy"].update(
+                {"source_replay": "unavailable_from_public_payload"}
+            ),
+        ),
+        (
+            "authority-project-mismatch",
+            lambda payload: payload["data"]["authority"]["accounts"][0].update(
+                {"project_id": "different-project"}
+            ),
+        ),
+        (
+            "missing-account-evidence",
+            lambda payload: payload["data"]["actors"][0]["account"].pop("evidence"),
+        ),
+        (
+            "unknown-account-evidence-key",
+            lambda payload: payload["data"]["actors"][0]["account"]["evidence"].update(
+                {"commit_oid": "opaque"}
+            ),
+        ),
+        (
+            "raw-actor-measurement",
+            lambda payload: payload["data"]["actors"][0]["measurements"].update(
+                {"linked_commit_count": 24}
+            ),
+        ),
+        (
+            "unauthorized-second-actor",
+            lambda payload: payload["data"]["actors"].append(
+                copy.deepcopy(payload["data"]["actors"][0])
+            ),
+        ),
+    ):
+        payload = named_payload()
+        mutate(payload)
+        checks.append((name, lambda payload=payload: _payload_failures(payload)))
+    for profile in ("masked", "raw"):
+        payload = named_payload()
+        payload["privacy_profile"] = profile
+        checks.append(
+            (
+                f"controlled-profile-{profile}",
+                lambda payload=payload: _payload_failures(payload),
+            )
+        )
     return checks
 
 
@@ -126,7 +202,7 @@ def _mutation_check() -> list[tuple[str, Callable[[], list[str]]]]:
 
     def disabled_guard() -> list[str]:
         original = validator._safe_profile_url
-        validator._safe_profile_url = lambda _value, _host: True
+        validator._safe_profile_url = lambda _value, _host, _handle: True
         try:
             return _payload_failures(copy.deepcopy(payload))
         finally:

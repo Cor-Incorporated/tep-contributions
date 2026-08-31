@@ -1,0 +1,256 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Cor-Incorporated/tep-contributions/schemas/tep-contribution-v2-public.schema.json",
+  "title": "TEP public contribution v2 intake",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contribution_schema",
+    "privacy_profile",
+    "door",
+    "purpose",
+    "provenance_receipt_id",
+    "transformation_spec_digest",
+    "policy",
+    "data"
+  ],
+  "properties": {
+    "contribution_schema": {"const": "tep-contribution-v2"},
+    "privacy_profile": {"enum": ["aggregate", "named-public"]},
+    "door": {"const": "public-pr"},
+    "purpose": {"const": "TEP Report 集計と参照分布 vNext"},
+    "provenance_receipt_id": {"type": "string", "pattern": "^receipt_[a-z2-7]{26}$"},
+    "transformation_spec_digest": {"type": "string"},
+    "policy": {"type": "object"},
+    "data": {"type": "object"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"privacy_profile": {"const": "aggregate"}}},
+      "then": {
+        "properties": {
+          "transformation_spec_digest": {"const": "sha256:559265d4d765abb19de629329c3424d3b2fdb633fe45abbe9d964b651f3f5d04"},
+          "policy": {"$ref": "#/$defs/aggregatePolicy"},
+          "data": {"$ref": "#/$defs/aggregateData"}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"privacy_profile": {"const": "named-public"}}},
+      "then": {
+        "properties": {
+          "transformation_spec_digest": {"const": "sha256:d6f759617a832b2ca7bf4a12e7808d44ca6e5d38ab9b2f406048e3e5bb207baa"},
+          "policy": {"$ref": "#/$defs/namedPolicy"},
+          "data": {"$ref": "#/$defs/namedData"}
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "aggregatePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["access_class", "public_payload", "source_replay"],
+      "properties": {
+        "access_class": {"const": "public"},
+        "public_payload": {"const": true},
+        "source_replay": {"const": "unavailable_from_public_payload"}
+      }
+    },
+    "namedPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["access_class", "public_payload", "source_replay"],
+      "properties": {
+        "access_class": {"const": "public"},
+        "public_payload": {"const": true},
+        "source_replay": {"const": "public_api_recollect_required"}
+      }
+    },
+    "bucketTree": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {"pattern": "^[a-z][a-z0-9_]*$"},
+      "additionalProperties": {
+        "oneOf": [
+          {"type": "boolean"},
+          {"type": "string", "maxLength": 120},
+          {"$ref": "#/$defs/bucketTree"}
+        ]
+      }
+    },
+    "measurements": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "properties": {
+        "activity": {"$ref": "#/$defs/bucketTree"},
+        "attribution": {"$ref": "#/$defs/bucketTree"},
+        "change_rhythm": {"$ref": "#/$defs/bucketTree"},
+        "context_profile": {"$ref": "#/$defs/bucketTree"},
+        "coordination_profile": {"$ref": "#/$defs/bucketTree"},
+        "event_observation": {"$ref": "#/$defs/bucketTree"},
+        "event_rhythm": {"$ref": "#/$defs/bucketTree"},
+        "experience": {"$ref": "#/$defs/bucketTree"},
+        "role_lens": {"$ref": "#/$defs/bucketTree"},
+        "role_profile": {"$ref": "#/$defs/bucketTree"},
+        "surface_profile": {"$ref": "#/$defs/bucketTree"},
+        "tracker_lifecycle": {"$ref": "#/$defs/bucketTree"},
+        "verification_profile": {"$ref": "#/$defs/bucketTree"}
+      }
+    },
+    "coverageItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {"enum": ["observed", "not_observed", "not_proven"]},
+        "provided": {"type": "boolean"},
+        "reason": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]*$"}
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {
+        "enum": [
+          "event_window",
+          "forge",
+          "forge_tracker_window_alignment",
+          "git",
+          "git_window",
+          "public_forge",
+          "report",
+          "tracker",
+          "tracker_window",
+          "window_alignment"
+        ]
+      },
+      "additionalProperties": {"$ref": "#/$defs/coverageItem"}
+    },
+    "missingness": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "kind", "reason"],
+        "properties": {
+          "path": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]*$"},
+          "kind": {"enum": ["not_declared", "not_observed", "not_proven", "suppressed"]},
+          "reason": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]*$"}
+        }
+      }
+    },
+    "aggregateData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["population", "measurements", "coverage", "missingness"],
+      "properties": {
+        "population": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["n_bucket", "denominator_bucket"],
+          "properties": {
+            "n_bucket": {"$ref": "#/$defs/bucket"},
+            "denominator_bucket": {"$ref": "#/$defs/bucket"}
+          }
+        },
+        "measurements": {"$ref": "#/$defs/measurements"},
+        "coverage": {"$ref": "#/$defs/coverage"},
+        "missingness": {"$ref": "#/$defs/missingness"}
+      }
+    },
+    "bucket": {
+      "enum": [
+        "0", "1-4", "5-19", "20-99", "100-499", "500-1999", "2000+",
+        "00-10%", "10-20%", "20-30%", "30-40%", "40-50%", "50-60%",
+        "60-70%", "70-80%", "80-90%", "90-100%"
+      ]
+    },
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "host", "project_id", "project_path"],
+      "properties": {
+        "provider": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]{0,95}$"},
+        "host": {"type": "string", "minLength": 1, "maxLength": 255},
+        "project_id": {"type": "string", "minLength": 1, "maxLength": 255},
+        "project_path": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._~-]*/[A-Za-z0-9][A-Za-z0-9._~/-]*$"}
+      }
+    },
+    "authorityAccount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "host", "project_id", "account_id", "basis", "scope", "assertion"],
+      "properties": {
+        "provider": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]{0,95}$"},
+        "host": {"type": "string", "minLength": 1, "maxLength": 255},
+        "project_id": {"type": "string", "minLength": 1, "maxLength": 255},
+        "account_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"},
+        "basis": {"const": "account_holder_explicit"},
+        "scope": {"const": "project_and_account"},
+        "assertion": {"const": "authorized_for_public_research_contribution"}
+      }
+    },
+    "account": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "host", "account_id", "handle", "profile_url", "evidence"],
+      "properties": {
+        "provider": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]{0,95}$"},
+        "host": {"type": "string", "minLength": 1, "maxLength": 255},
+        "account_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"},
+        "handle": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"},
+        "profile_url": {"type": "string", "format": "uri", "pattern": "^https://"},
+        "evidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["basis", "coverage_status", "account_match_status"],
+          "properties": {
+            "basis": {"enum": ["commit.author.id", "commit_sha_to_account", "provider_commit_account"]},
+            "coverage_status": {"enum": ["complete", "partial"]},
+            "account_match_status": {"const": "linked"}
+          }
+        }
+      }
+    },
+    "namedActor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["account", "measurements"],
+      "properties": {
+        "account": {"$ref": "#/$defs/account"},
+        "measurements": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["linked_commit_count_bucket", "actor_commit_count_bucket", "linkage_coverage_bucket", "commit_count_basis"],
+          "properties": {
+            "linked_commit_count_bucket": {"enum": ["0", "1-4", "5-19", "20-99", "100-499", "500-1999", "2000+"]},
+            "actor_commit_count_bucket": {"enum": ["0", "1-4", "5-19", "20-99", "100-499", "500-1999", "2000+"]},
+            "linkage_coverage_bucket": {"enum": ["00-10%", "10-20%", "20-30%", "30-40%", "40-50%", "50-60%", "60-70%", "70-80%", "80-90%", "90-100%"]},
+            "commit_count_basis": {"const": "git_primary_author_cluster_including_merges"}
+          }
+        }
+      }
+    },
+    "namedData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["project", "authority", "actors", "measurements", "coverage", "missingness"],
+      "properties": {
+        "project": {"$ref": "#/$defs/project"},
+        "authority": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["accounts"],
+          "properties": {
+            "accounts": {"type": "array", "minItems": 1, "maxItems": 1, "items": {"$ref": "#/$defs/authorityAccount"}}
+          }
+        },
+        "actors": {"type": "array", "minItems": 1, "maxItems": 1, "items": {"$ref": "#/$defs/namedActor"}},
+        "measurements": {"$ref": "#/$defs/measurements"},
+        "coverage": {"$ref": "#/$defs/coverage"},
+        "missingness": {"$ref": "#/$defs/missingness"}
+      }
+    }
+  }
+}

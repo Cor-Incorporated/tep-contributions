@@ -17,8 +17,8 @@ v0.6.0 以降の `grift contribute --privacy` は 4 プロファイルを生成�
 
 | profile | このリポジトリへの提出 | 保持する情報 |
 |---|---|---|
-| `aggregate` | 可（公開ドア・身元非公開ドア） | bucket 化集計・n・denominator・coverage・missingness・random receipt ID。Actor 行・repo/remote/OID・時刻・source digest なし |
-| `named-public` | 可（公開ドア・身元非公開ドア） | provider-neutral な公開 project/account 参照と本人Actor観測。raw email・内部Actor ID・pseudonym なし |
+| `aggregate` | 可（公開ドア・身元非公開ドア） | bucket 化集計・n・denominator・coverage・missingness・random receipt ID。Actor 行・repo/remote/OID・時刻・source digest なし。公開 payload 単独では source replay・重複排除不可 |
+| `named-public` | 可（公開ドア・身元非公開ドア） | provider-neutral な公開 project/account 参照と本人Actor観測。project と account に拘束した本人の明示 authority、provider commit account evidence、coverage を必須化。raw email・内部Actor ID・pseudonym なし |
 | `masked` | **不可（hard error）** | HMAC pseudonym 付き高精度観測。controlled study 用 sidecar が必要 |
 | `raw` | **不可（hard error）** | raw names/emails/OID。研究用 controlled 経路専用 |
 
@@ -56,12 +56,16 @@ grift contribute --out .grift/contribution.json  # ② payload を組み・全�
 CI が各 PR に対して実行します（識別情報を含む PR は**機械的に fail**）:
 
 - payload スキーマ検証（`tep-contribution-v1` または `tep-contribution-v2` の公開プロファイル・repo スコープのみ。v2 は `aggregate` / `named-public` のみ受理）
+- v2 は profile 別 transformation digest と source replay 契約を固定（`aggregate=unavailable_from_public_payload`、`named-public=public_api_recollect_required`）
+- `named-public` は現在、同一 project 上の1つの stable account だけを受理。`account_holder_explicit` / `project_and_account` authority と、closed evidence・coverage・Actor bucket を相互照合
 - **needle sweep**: メール形式の文字列・v1 `actors` 配列・パス・repo 名フィールド・`@` を含む一切の文字列・git OID 形（40/64 hex）の文字列
 - v2 `named-public` の URL/account 参照は provider/host/project/account の閉じた構造のみ許可（raw email と controlled payload は拒否）
 
 **含まれている（注明つき）**: v1 `metrics.provenance.analyzed_commit_sha`（分析時点のコミット SHA）と `analyzed_at`（分析時刻）。**SHA は中身を復元できない不透明値ですが、公開 repo では対象の特定に使えます**（特徴の組合せから推測されるリスクと同旨の開示です）。v2 `aggregate` はこの SHA を含みません。
 
 **含まれていない（規則で排除）**: canonical_id・actors（v1）・メール・パス・repo 名（`attribution` フィールドへの任意付記を除く）・tenant スコープ値・v2 では git OID 全般。
+
+`aggregate` は公開 payload だけから元データを replay できないため、単独で参照分布の確定根拠にはしません。`named-public` も公開 API の再収集と coverage 確認が必要です。受信 schema、CLI 実出力 fixture、known-accident mutation ledger は CI で同時に検査します。
 
 ## 分布への算入
 

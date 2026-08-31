@@ -6,11 +6,11 @@
 
 ## 公開ドア（本人 PR）/ Public door
 
-1. 対象リポジトリで `grift report` を実行（grift-cli 0.5.5 以降）
-2. `grift contribute --out .grift/contribution.json` で payload を組み、**全文を確認**
+1. 対象リポジトリで `grift report` を実行（v2 は grift-cli 0.6.0 以降）
+2. `grift contribute --privacy aggregate|named-public --door public-pr --out .grift/contribution.json` で payload を組み、**全文を確認**
 3. このリポジトリに PR:
    - **payload ファイル**: `payloads/2026/<submission-id>.json`（`grift contribute` の出力をそのまま・手編集不可）
-   - **manifest.jsonl に1行追記**: `{"id":"<submission-id>","sha256":"<sha256>","received_at":"<ISO8601>","door":"pr"}`
+   - **meta sidecar**: 同じ場所へ `<submission-id>.meta.json` を追加: `{"id":"<submission-id>","sha256":"<sha256>","received_at":"<ISO8601>","door":"pr"}`。`manifest.jsonl` は main CI の single writer が生成するため PR では編集しない
    - クレジット希望者のみ payload に `attribution: "表示名"` を追加（任意・64文字以内・メール/URL 禁止）
    - ブランチ名: `contrib/<submission-id>`／PR タイトル: `contribution: <submission-id>`
 
@@ -20,7 +20,9 @@ payload ファイルをフォーム（または README の連絡先メール）�
 
 ## ルール / Rules
 
-- CI が schema（`tep-contribution-v1`）・sha256・needle sweep（メール形式・actors・パス・repo 名・`@`）を検証します。**識別情報を含む PR は機械的に fail します**
+- CI が schema（legacy `tep-contribution-v1` と公開 `tep-contribution-v2`）・sha256・needle sweep（メール形式・actors・パス・repo 名・`@`）を検証します。**識別情報を含む PR は機械的に fail します**
+- v2 の `aggregate` / `named-public` は profile 別 digest・source replay・closed measurement を検証します。`named-public` は project/account に拘束した本人 authority と public account evidence/coverage が必要です
+- `masked` / `raw` は controlled 専用のため、この公開 intake では hard error です
 - 手編集された payload は sha256/スキーマ検証で落ちます
 - 1 リポジトリ 1 最新提出（更新は新しい PR で）
 

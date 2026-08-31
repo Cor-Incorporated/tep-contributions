@@ -9,6 +9,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from jsonschema import Draft202012Validator
+
 from scripts.falsify_security import named_payload
 
 
@@ -16,6 +18,8 @@ ROOT = Path(__file__).resolve().parents[1]
 VALIDATOR = ROOT / "scripts" / "validate.py"
 FALSIFIER = ROOT / "scripts" / "falsify_security.py"
 WORKFLOW = ROOT / ".github" / "workflows" / "validate.yml"
+SCHEMA = ROOT / "schemas" / "tep-contribution-v2-public.schema.json"
+PRODUCER_FIXTURES = ROOT / "tests" / "fixtures" / "grift-cli-1f8f4fe"
 
 
 class ValidatorSecurityTests(unittest.TestCase):
@@ -55,7 +59,10 @@ class ValidatorSecurityTests(unittest.TestCase):
         return self.run_intake(json.dumps(payload, ensure_ascii=False))
 
     def test_valid_named_public_profile_still_passes(self) -> None:
-        result = self.run_payload(named_payload())
+        payload = named_payload()
+        schema = json.loads(SCHEMA.read_text(encoding="utf-8"))
+        Draft202012Validator(schema).validate(payload)
+        result = self.run_payload(payload)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_profile_url_rejects_userinfo_query_fragment_and_encoded_forms(
@@ -84,10 +91,10 @@ class ValidatorSecurityTests(unittest.TestCase):
         ):
             with self.subTest(credential=credential):
                 payload = named_payload()
-                payload["data"]["authority"]["assertion"] = credential
+                payload["data"]["authority"]["accounts"][0]["assertion"] = credential
                 result = self.run_payload(payload)
                 self.assertNotEqual(result.returncode, 0, result.stdout)
-                self.assertIn("authority.assertion", result.stdout)
+                self.assertIn("authority vocabulary", result.stdout)
 
     def test_strict_json_rejects_duplicate_keys_and_non_finite_numbers(self) -> None:
         cases = (
@@ -139,7 +146,7 @@ class ValidatorSecurityTests(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             rows = [json.loads(line) for line in ledger.read_text().splitlines()]
-        self.assertEqual(len(rows), 8)
+        self.assertEqual(len(rows), 17)
         self.assertEqual(
             [row["case"] for row in rows], sorted(row["case"] for row in rows)
         )
@@ -184,7 +191,9 @@ class ValidatorSecurityTests(unittest.TestCase):
         payload["data"]["actors"] = []
         result = self.run_payload(payload)
         self.assertEqual(
-            result.stdout.count("named-public actors must be a non-empty array"),
+            result.stdout.count(
+                "named-public actors must contain exactly one account-bound row"
+            ),
             1,
             result.stdout,
         )
@@ -209,6 +218,80 @@ class ValidatorSecurityTests(unittest.TestCase):
             1,
             result.stdout,
         )
+
+    def test_exact_grift_cli_public_fixtures_pass_schema_and_intake(self) -> None:
+        schema = json.loads(SCHEMA.read_text(encoding="utf-8"))
+        Draft202012Validator.check_schema(schema)
+        validator = Draft202012Validator(schema)
+        for fixture_name in ("aggregate.json", "named-public.json"):
+            with self.subTest(fixture=fixture_name):
+                raw = (PRODUCER_FIXTURES / fixture_name).read_text(encoding="utf-8")
+                payload = json.loads(raw)
+                errors = sorted(
+                    validator.iter_errors(payload), key=lambda error: list(error.path)
+                )
+                self.assertEqual(errors, [], [error.message for error in errors])
+                result = self.run_intake(raw)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_profile_digest_and_source_replay_are_bound(self) -> None:
+        fixture_names = ("aggregate.json", "named-public.json")
+        for fixture_name in fixture_names:
+            payload = json.loads((PRODUCER_FIXTURES / fixture_name).read_text())
+            for field, value in (
+                ("transformation_spec_digest", "sha256:" + "0" * 64),
+                ("source_replay", "controlled_sidecar_available"),
+            ):
+                with self.subTest(fixture=fixture_name, field=field):
+                    poisoned = copy.deepcopy(payload)
+                    if field == "source_replay":
+                        poisoned["policy"][field] = value
+                    else:
+                        poisoned[field] = value
+                    result = self.run_payload(poisoned)
+                    self.assertNotEqual(result.returncode, 0, result.stdout)
+
+    def test_named_public_binding_evidence_and_measurements_are_closed(self) -> None:
+        base = json.loads((PRODUCER_FIXTURES / "named-public.json").read_text())
+        mutations = {
+            "authority-project": lambda payload: payload["data"]["authority"][
+                "accounts"
+            ][0].update({"project_id": "different"}),
+            "authority-basis": lambda payload: payload["data"]["authority"]["accounts"][
+                0
+            ].update({"basis": "repository-owner"}),
+            "evidence-missing": lambda payload: payload["data"]["actors"][0][
+                "account"
+            ].pop("evidence"),
+            "evidence-unknown": lambda payload: payload["data"]["actors"][0]["account"][
+                "evidence"
+            ].update({"commit_oid": "opaque"}),
+            "coverage-status": lambda payload: payload["data"]["actors"][0]["account"][
+                "evidence"
+            ].update({"coverage_status": "unknown"}),
+            "raw-measurement": lambda payload: payload["data"]["actors"][0][
+                "measurements"
+            ].update({"linked_commit_count": 7}),
+            "second-actor": lambda payload: payload["data"]["actors"].append(
+                copy.deepcopy(payload["data"]["actors"][0])
+            ),
+        }
+        for name, mutate in mutations.items():
+            with self.subTest(name=name):
+                payload = copy.deepcopy(base)
+                mutate(payload)
+                result = self.run_payload(payload)
+                self.assertNotEqual(result.returncode, 0, result.stdout)
+
+    def test_controlled_profiles_are_hard_rejected_at_public_intake(self) -> None:
+        base = json.loads((PRODUCER_FIXTURES / "aggregate.json").read_text())
+        for profile in ("masked", "raw"):
+            with self.subTest(profile=profile):
+                payload = copy.deepcopy(base)
+                payload["privacy_profile"] = profile
+                result = self.run_payload(payload)
+                self.assertNotEqual(result.returncode, 0, result.stdout)
+                self.assertIn("controlled-study artifact", result.stdout)
 
 
 if __name__ == "__main__":

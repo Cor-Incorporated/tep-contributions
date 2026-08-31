@@ -1,0 +1,51 @@
+{
+  "contribution_schema": "tep-contribution-v2",
+  "data": {
+    "coverage": {
+      "forge": {"kind": "not_observed", "reason": "forge_export_not_provided"},
+      "git": {"kind": "observed", "provided": true}
+    },
+    "measurements": {
+      "activity": {
+        "active_days": {"kind": "observed", "unit": "days", "value_bucket": "20-99"},
+        "active_days_13w": {"kind": "observed", "unit": "days", "value_bucket": "20-99"},
+        "commits_per_active_day": {"kind": "observed", "unit": "commits", "value_bucket": "1-4"},
+        "commits_per_active_day_median": {"kind": "observed", "unit": "commits", "value_bucket": "1-4"},
+        "repo_human_nonmerge_commits": {"kind": "observed", "sample_size_bucket": "100-499", "unit": "commits", "value_bucket": "100-499"}
+      },
+      "attribution": {
+        "attributed_commit_count_bucket": "100-499",
+        "attribution_coverage": {"kind": "observed", "sample_size_bucket": "100-499", "unit": "ratio", "value_bucket": "90-100%"},
+        "attribution_human_including_merges_bucket": "100-499",
+        "attribution_unresolved_commit_count_bucket": "0",
+        "bot_count_bucket": "0",
+        "coauthored_count_bucket": "0",
+        "human_commit_count_bucket": "100-499",
+        "merge_count_bucket": "5-19",
+        "observed_actor_count_bucket": "1-4",
+        "public_join": {
+          "account_conflict_count_bucket": "0",
+          "ambiguous_bucket": "0",
+          "commit_login_count_bucket": "1-4",
+          "matched_bucket": "5-19",
+          "public_handle_actors_bucket": "1-4",
+          "unmatched_bucket": "100-499"
+        },
+        "repo_human_nonmerge_commits_bucket": "100-499",
+        "unresolved_commit_count_bucket": "0"
+      },
+      "surface_profile": {"classification_basis": "path_pattern_and_extension_heuristic", "kind": "observed", "sample_size_bucket": "100-499", "unit": "commits", "value_bucket": "100-499"}
+    },
+    "missingness": [
+      {"kind": "suppressed", "path": "activity", "reason": "unregistered_text"},
+      {"kind": "suppressed", "path": "attribution", "reason": "unregistered_text"}
+    ],
+    "population": {"denominator_bucket": "100-499", "n_bucket": "1-4"}
+  },
+  "door": "public-pr",
+  "policy": {"access_class": "public", "public_payload": true, "source_replay": "unavailable_from_public_payload"},
+  "privacy_profile": "aggregate",
+  "provenance_receipt_id": "receipt_aaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "purpose": "TEP Report 集計と参照分布 vNext",
+  "transformation_spec_digest": "sha256:559265d4d765abb19de629329c3424d3b2fdb633fe45abbe9d964b651f3f5d04"
+}

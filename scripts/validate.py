@@ -29,13 +29,14 @@ Exits non-zero on any violation (PRs with identifying information fail CI).
 from __future__ import annotations
 
 import hashlib
+import ipaddress
 import json
 import math
 import re
 import sys
 from collections.abc import Iterable
 from pathlib import Path
-from urllib.parse import unquote_plus, urlsplit
+from urllib.parse import quote, unquote_plus, urlsplit, urlunsplit
 
 ALLOWED_PROV = {
     "tool_name",
@@ -70,12 +71,51 @@ V2_PUBLIC_PROFILES = {"aggregate", "named-public"}
 V2_CONTROLLED_PROFILES = {"masked", "raw"}
 V2_POLICY_KEYS = {"access_class", "public_payload", "source_replay"}
 V2_AGGREGATE_DATA = {"population", "measurements", "coverage", "missingness"}
-V2_NAMED_PUBLIC_DATA = {"project", "authority", "actors", "measurements", "coverage", "missingness"}
+V2_NAMED_PUBLIC_DATA = {
+    "project",
+    "authority",
+    "actors",
+    "measurements",
+    "coverage",
+    "missingness",
+}
 V2_PROJECT_KEYS = {"provider", "host", "project_id", "project_path"}
-V2_AUTHORITY_KEYS = {"basis", "scope", "assertion"}
-V2_ACCOUNT_KEYS = {"provider", "host", "account_id", "handle", "profile_url"}
+V2_AUTHORITY_KEYS = {"accounts"}
+V2_AUTHORITY_ACCOUNT_KEYS = {
+    "provider",
+    "host",
+    "project_id",
+    "account_id",
+    "basis",
+    "scope",
+    "assertion",
+}
+V2_ACCOUNT_KEYS = {
+    "provider",
+    "host",
+    "account_id",
+    "handle",
+    "profile_url",
+    "evidence",
+}
+V2_ACCOUNT_EVIDENCE_KEYS = {"basis", "coverage_status", "account_match_status"}
 V2_ACTOR_KEYS = {"account", "measurements"}
-FORBIDDEN_KEYS = {"canonical_id", "actor", "actors", "emails", "path", "repo", "repository", "name"}
+V2_ACTOR_MEASUREMENT_KEYS = {
+    "linked_commit_count_bucket",
+    "actor_commit_count_bucket",
+    "linkage_coverage_bucket",
+    "commit_count_basis",
+}
+FORBIDDEN_KEYS = {
+    "canonical_id",
+    "actor",
+    "actors",
+    "emails",
+    "path",
+    "repo",
+    "repository",
+    "name",
+}
 FORBIDDEN_KEYS_V2 = {
     "canonical_id",
     "emails",
@@ -121,8 +161,17 @@ HEX64_RE = re.compile(r"\b[0-9a-f]{64}\b")
 RECEIPT_RE = re.compile(r"^receipt_[a-z2-7]{26}$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 RECEIVED_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}")
-SAFE_TOKEN_RE = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
+SAFE_PROVIDER_RE = re.compile(r"^[a-z][a-z0-9_.-]{0,95}$")
+SAFE_ACCOUNT_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$")
+SAFE_HANDLE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
+SAFE_PROJECT_PATH_SEGMENT_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._~-]{0,127}$")
 PARAMETER_KEY_RE = re.compile(r"(?:^|[?&#;])([^=&#;\s]{1,120})=")
+HIGH_CONFIDENCE_TOKEN_RE = re.compile(
+    r"(?:github_pat_[A-Za-z0-9_]{20,}|gh[pousr]_[A-Za-z0-9]{20,}|"
+    r"glpat-[A-Za-z0-9_-]{20,}|AKIA[0-9A-Z]{16}|"
+    r"sk-(?:proj-)?[A-Za-z0-9_-]{20,}|xox[baprs]-[A-Za-z0-9-]{10,}|"
+    r"eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,})"
+)
 
 # ---------------------------------------------------------------------------
 # Closed allowlists mirrored from grift-cli src/tep_core/contribution_v2.py.
@@ -130,9 +179,24 @@ PARAMETER_KEY_RE = re.compile(r"(?:^|[?&#;])([^=&#;\s]{1,120})=")
 # .github/workflows/ci.yml "intake-contract-parity" job). Update both sides
 # in one coordinated change; a silent drift fails that job.
 # ---------------------------------------------------------------------------
-TRANSFORMATION_SPEC_DIGEST = (
-    "sha256:42eb35f299c3d97490b459c590279b5a28e0790c393a6ac075f21e89e6b8f502"
-)
+TRANSFORMATION_SPEC_DIGESTS = {
+    "aggregate": "sha256:559265d4d765abb19de629329c3424d3b2fdb633fe45abbe9d964b651f3f5d04",
+    "named-public": "sha256:d6f759617a832b2ca7bf4a12e7808d44ca6e5d38ab9b2f406048e3e5bb207baa",
+}
+SOURCE_REPLAY_BY_PROFILE = {
+    "aggregate": "unavailable_from_public_payload",
+    "named-public": "public_api_recollect_required",
+}
+NAMED_AUTHORITY_BASIS = "account_holder_explicit"
+NAMED_AUTHORITY_SCOPE = "project_and_account"
+NAMED_AUTHORITY_ASSERTION = "authorized_for_public_research_contribution"
+PUBLIC_ACCOUNT_EVIDENCE_BASES = {
+    "commit.author.id",
+    "commit_sha_to_account",
+    "provider_commit_account",
+}
+PUBLIC_ACCOUNT_COVERAGE = {"complete", "partial"}
+NAMED_COMMIT_COUNT_BASIS = "git_primary_author_cluster_including_merges"
 MEASUREMENT_SECTIONS = frozenset(
     {
         "activity",
@@ -164,12 +228,14 @@ AGGREGATE_COVERAGE_SOURCES = frozenset(
         "window_alignment",
     }
 )
-MISSINGNESS_KINDS = frozenset({"not_observed", "not_proven", "not_declared", "suppressed"})
+MISSINGNESS_KINDS = frozenset(
+    {"not_observed", "not_proven", "not_declared", "suppressed"}
+)
 MISSINGNESS_PATHS = MEASUREMENT_SECTIONS | {"input_coverage"}
 COVERAGE_KINDS = frozenset({"observed", "not_observed", "not_proven"})
 COUNT_BUCKETS = frozenset({"0", "1-4", "5-19", "20-99", "100-499", "500-1999", "2000+"})
 RATIO_BUCKETS = frozenset(f"{i:02d}-{i + 10:02d}%" for i in range(0, 100, 10))
-BUCKET_VALUES = COUNT_BUCKETS | RATIO_BUCKETS | {"unknown"}
+BUCKET_VALUES = COUNT_BUCKETS | RATIO_BUCKETS
 TEXT_ENUMS = {
     "kind": frozenset(
         {
@@ -226,6 +292,9 @@ TEXT_ENUMS = {
         }
     ),
     "classification_basis": frozenset({"path_pattern_and_extension_heuristic"}),
+    "window_basis": frozenset({"explicit_as_of", "fixed_oid", "legacy_head_date"}),
+    "analysis_scope": frozenset({"repo"}),
+    "fixture_kind": frozenset({"synthetic_contract"}),
 }
 with (Path(__file__).resolve().parent / "intake_allowlists.json").open(
     "r", encoding="utf-8"
@@ -234,6 +303,21 @@ with (Path(__file__).resolve().parent / "intake_allowlists.json").open(
 AGGREGATE_FIELD_KEYS = frozenset(_ALLOWLISTS["aggregate_field_keys"])
 AGGREGATE_VALUE_LABELS = frozenset(_ALLOWLISTS["value_labels"])
 AGGREGATE_REASONS = frozenset(_ALLOWLISTS["reasons"])
+if _ALLOWLISTS.get("transformation_spec_digests") != TRANSFORMATION_SPEC_DIGESTS:
+    raise RuntimeError("intake allowlist profile digests drifted from validator")
+if _ALLOWLISTS.get("source_replay_by_profile") != SOURCE_REPLAY_BY_PROFILE:
+    raise RuntimeError("intake allowlist source-replay policy drifted from validator")
+_named_allowlist = _ALLOWLISTS.get("named_public")
+if not isinstance(_named_allowlist, dict) or _named_allowlist != {
+    "authority_basis": NAMED_AUTHORITY_BASIS,
+    "authority_scope": NAMED_AUTHORITY_SCOPE,
+    "authority_assertion": NAMED_AUTHORITY_ASSERTION,
+    "account_evidence_bases": sorted(PUBLIC_ACCOUNT_EVIDENCE_BASES),
+    "coverage_statuses": sorted(PUBLIC_ACCOUNT_COVERAGE),
+    "commit_count_basis": NAMED_COMMIT_COUNT_BASIS,
+    "max_accounts": 1,
+}:
+    raise RuntimeError("intake allowlist named-public contract drifted from validator")
 
 
 _FAILURES: list[str] = []
@@ -394,24 +478,105 @@ def _safe_public_text(value: object, *, allow_url: bool = False) -> bool:
     return True
 
 
-def _safe_profile_url(value: object, host: object) -> bool:
-    if not _safe_public_text(value, allow_url=True) or not _is_str(host):
+def _valid_host(value: object) -> bool:
+    if not isinstance(value, str) or not value or value != value.lower():
+        return False
+    if (
+        any(character in value for character in "/@?#\\")
+        or any(character.isspace() for character in value)
+        or value.startswith(("http://", "https://"))
+    ):
+        return False
+    try:
+        parsed = urlsplit("//" + value)
+        _ = parsed.port
+    except ValueError:
+        return False
+    if (
+        not parsed.hostname
+        or parsed.username
+        or parsed.password
+        or parsed.path
+        or parsed.query
+        or parsed.fragment
+        or parsed.netloc != value
+    ):
+        return False
+    hostname = parsed.hostname
+    try:
+        if ":" in hostname:
+            canonical_hostname = f"[{ipaddress.IPv6Address(hostname).compressed}]"
+        elif re.fullmatch(r"[0-9.]+", hostname):
+            canonical_hostname = str(ipaddress.IPv4Address(hostname))
+        else:
+            labels = hostname.split(".")
+            if len(hostname) > 253 or any(
+                not re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", label)
+                for label in labels
+            ):
+                return False
+            canonical_hostname = hostname
+    except ipaddress.AddressValueError:
+        return False
+    canonical = canonical_hostname
+    if parsed.port is not None:
+        canonical += f":{parsed.port}"
+    return value == canonical
+
+
+def _safe_project_id(value: object) -> bool:
+    if not isinstance(value, str) or not value or len(value) > 255:
+        return False
+    if (
+        "@" in value
+        or any(character.isspace() or ord(character) < 0x20 for character in value)
+        or _contains_credential_parameter(value)
+        or HIGH_CONFIDENCE_TOKEN_RE.search(value)
+    ):
+        return False
+    has_scheme = re.match(r"^[A-Za-z][A-Za-z0-9+.-]*://", value) is not None
+    return not has_scheme or value.startswith("gid://")
+
+
+def _safe_project_path(value: object) -> bool:
+    if not isinstance(value, str):
+        return False
+    segments = value.split("/")
+    return len(segments) >= 2 and all(
+        SAFE_PROJECT_PATH_SEGMENT_RE.fullmatch(segment) for segment in segments
+    )
+
+
+def _safe_profile_url(value: object, host: object, handle: object) -> bool:
+    if (
+        not _safe_public_text(value, allow_url=True)
+        or not _valid_host(host)
+        or not isinstance(handle, str)
+        or not SAFE_HANDLE_RE.fullmatch(handle)
+    ):
         return False
     expected_host = str(host)
+    expected_url = f"https://{expected_host}/{quote(handle, safe='')}"
     for candidate in _decoded_variants(str(value)):
         try:
             parsed = urlsplit(candidate)
+            expected = urlsplit("//" + expected_host)
+            actual_port = parsed.port
+            expected_port = expected.port
         except ValueError:
             return False
         if (
             parsed.scheme != "https"
-            or parsed.hostname != expected_host
-            or parsed.netloc != expected_host
             or parsed.username is not None
             or parsed.password is not None
-            or bool(parsed.query)
-            or bool(parsed.fragment)
-            or not parsed.path.startswith("/")
+            or parsed.query
+            or parsed.fragment
+            or (parsed.hostname or "").lower() != (expected.hostname or "").lower()
+            or actual_port != expected_port
+            or expected_port == 443
+            or parsed.netloc != expected_host
+            or candidate != expected_url
+            or candidate != urlunsplit(("https", expected_host, parsed.path, "", ""))
         ):
             return False
     return True
@@ -468,7 +633,9 @@ def _validate_measurement_tree(node: object, label: str, prefix: str) -> None:
                 if value not in TEXT_ENUMS[key]:
                     fail(f"{label}: unregistered {key} value {value!r} at {where}")
                 continue
-            fail(f"{label}: free-form string at {where} is not produced by the transformer")
+            fail(
+                f"{label}: free-form string at {where} is not produced by the transformer"
+            )
             continue
         _validate_measurement_tree(value, label, where)
 
@@ -584,16 +751,24 @@ def _validate_v2(payload: dict, label: str) -> None:
     if not _is_str(receipt) or not RECEIPT_RE.fullmatch(str(receipt)):
         fail(f"{label}: provenance_receipt_id must be an opaque receipt id")
     digest = payload.get("transformation_spec_digest")
-    if digest != TRANSFORMATION_SPEC_DIGEST:
+    expected_digest = TRANSFORMATION_SPEC_DIGESTS.get(str(profile))
+    if digest != expected_digest:
         fail(
-            f"{label}: transformation_spec_digest must equal the digest emitted by "
-            "the grift CLI transformer"
+            f"{label}: transformation_spec_digest must equal the {profile!r} "
+            "digest emitted by the grift CLI transformer"
         )
     policy = payload.get("policy")
-    if not isinstance(policy, dict) or set(policy) - V2_POLICY_KEYS:
+    if not isinstance(policy, dict) or set(policy) != V2_POLICY_KEYS:
         fail(f"{label}: policy keys are outside the closed v2 policy shape")
-    elif policy.get("public_payload") is not True or policy.get("access_class") != "public":
-        fail(f"{label}: v2 public intake requires policy.public_payload=true / access_class=public")
+    elif (
+        policy.get("public_payload") is not True
+        or policy.get("access_class") != "public"
+        or policy.get("source_replay") != SOURCE_REPLAY_BY_PROFILE[profile]
+    ):
+        fail(
+            f"{label}: v2 public policy must use access_class=public, "
+            f"public_payload=true, source_replay={SOURCE_REPLAY_BY_PROFILE[profile]}"
+        )
     data = payload.get("data")
     if not isinstance(data, dict):
         fail(f"{label}: v2 data must be an object")
@@ -608,7 +783,9 @@ def _validate_v2(payload: dict, label: str) -> None:
         _validate_aggregate_population(data.get("population"), label)
     else:
         if set(data) != V2_NAMED_PUBLIC_DATA:
-            fail(f"{label}: named-public data keys must be exactly {sorted(V2_NAMED_PUBLIC_DATA)}")
+            fail(
+                f"{label}: named-public data keys must be exactly {sorted(V2_NAMED_PUBLIC_DATA)}"
+            )
             return
         _validate_named_public(data, label)
     _validate_aggregate_measurements(data.get("measurements"), label)
@@ -630,31 +807,78 @@ def _validate_v2(payload: dict, label: str) -> None:
     else:
         swept = text
     if HEX40_RE.search(swept) or HEX64_RE.search(swept):
-        fail(f"{label}: git-object-shaped hex string present outside the registered digest")
+        fail(
+            f"{label}: git-object-shaped hex string present outside the registered digest"
+        )
 
 
 def _validate_named_public(data: dict, label: str) -> None:
     project = data.get("project")
     if not isinstance(project, dict) or set(project) != V2_PROJECT_KEYS:
-        fail(f"{label}: named-public project must have exactly {sorted(V2_PROJECT_KEYS)}")
-    else:
-        for key, value in project.items():
-            if not _safe_public_text(value):
-                fail(f"{label}: named-public project.{key} is not safe public text")
-        if str(project.get("project_path", "")).startswith("/"):
-            fail(f"{label}: named-public project_path must be relative, not absolute")
-    authority = data.get("authority")
-    if not isinstance(authority, dict) or not authority or set(authority) - V2_AUTHORITY_KEYS:
         fail(
-            f"{label}: named-public authority must be a non-empty {sorted(V2_AUTHORITY_KEYS)} object"
+            f"{label}: named-public project must have exactly {sorted(V2_PROJECT_KEYS)}"
+        )
+        project = {}
+    else:
+        if not isinstance(
+            project.get("provider"), str
+        ) or not SAFE_PROVIDER_RE.fullmatch(str(project.get("provider"))):
+            fail(f"{label}: named-public project.provider is not canonical")
+        if not _valid_host(project.get("host")):
+            fail(f"{label}: named-public project.host is not canonical")
+        if not _safe_project_id(project.get("project_id")):
+            fail(f"{label}: named-public project.project_id is not canonical")
+        if not _safe_project_path(project.get("project_path")):
+            fail(f"{label}: named-public project.project_path is not canonical")
+    authority = data.get("authority")
+    if not isinstance(authority, dict) or set(authority) != V2_AUTHORITY_KEYS:
+        fail(
+            f"{label}: named-public authority must contain only "
+            f"{sorted(V2_AUTHORITY_KEYS)}"
+        )
+        authority_rows: object = None
+    else:
+        authority_rows = authority.get("accounts")
+    authority_bindings: set[tuple[str, str, str]] = set()
+    if not isinstance(authority_rows, list) or len(authority_rows) != 1:
+        fail(
+            f"{label}: named-public authority.accounts must contain exactly one account"
         )
     else:
-        for key, value in authority.items():
-            if not _safe_public_text(value):
-                fail(f"{label}: named-public authority.{key} is not safe public text")
+        for index, row in enumerate(authority_rows):
+            where = f"{label}: authority.accounts[{index}]"
+            if not isinstance(row, dict) or set(row) != V2_AUTHORITY_ACCOUNT_KEYS:
+                fail(f"{where}: fields are outside the closed authority account shape")
+                continue
+            binding = (
+                str(row.get("provider")),
+                str(row.get("host")),
+                str(row.get("account_id")),
+            )
+            if binding in authority_bindings:
+                fail(f"{where}: duplicate authority account binding")
+            authority_bindings.add(binding)
+            if (
+                row.get("provider") != project.get("provider")
+                or row.get("host") != project.get("host")
+                or row.get("project_id") != project.get("project_id")
+            ):
+                fail(f"{where}: authority binding does not match project")
+            if not SAFE_ACCOUNT_ID_RE.fullmatch(
+                str(row.get("account_id", ""))
+            ) or HIGH_CONFIDENCE_TOKEN_RE.search(str(row.get("account_id", ""))):
+                fail(f"{where}: account_id is not canonical")
+            if str(row.get("account_id", "")).startswith("legacy-login:"):
+                fail(f"{where}: legacy login is not a stable account id")
+            if (
+                row.get("basis") != NAMED_AUTHORITY_BASIS
+                or row.get("scope") != NAMED_AUTHORITY_SCOPE
+                or row.get("assertion") != NAMED_AUTHORITY_ASSERTION
+            ):
+                fail(f"{where}: authority vocabulary is not registered")
     actors = data.get("actors")
-    if not isinstance(actors, list) or not actors:
-        fail(f"{label}: named-public actors must be a non-empty array")
+    if not isinstance(actors, list) or len(actors) != 1:
+        fail(f"{label}: named-public actors must contain exactly one account-bound row")
         return
     seen_accounts: set[tuple[str, str, str]] = set()
     for index, actor in enumerate(actors):
@@ -667,13 +891,29 @@ def _validate_named_public(data: dict, label: str) -> None:
         if not isinstance(account, dict) or set(account) != V2_ACCOUNT_KEYS:
             fail(f"{where}: account must have exactly {sorted(V2_ACCOUNT_KEYS)}")
             continue
-        for key in ("provider", "host", "account_id", "handle"):
-            if not _is_str(account.get(key)) or not SAFE_TOKEN_RE.fullmatch(str(account.get(key))):
-                fail(f"{where}: account.{key} must be a safe public token")
+        if not isinstance(
+            account.get("provider"), str
+        ) or not SAFE_PROVIDER_RE.fullmatch(str(account.get("provider"))):
+            fail(f"{where}: account.provider must be canonical")
+        if not _valid_host(account.get("host")):
+            fail(f"{where}: account.host must be canonical")
+        if not isinstance(
+            account.get("account_id"), str
+        ) or not SAFE_ACCOUNT_ID_RE.fullmatch(str(account.get("account_id"))):
+            fail(f"{where}: account.account_id must be a stable public id")
+        elif HIGH_CONFIDENCE_TOKEN_RE.search(str(account.get("account_id"))):
+            fail(f"{where}: account.account_id resembles credential material")
+        if str(account.get("account_id", "")).startswith("legacy-login:"):
+            fail(f"{where}: legacy login is not a stable account id")
+        if not isinstance(account.get("handle"), str) or not SAFE_HANDLE_RE.fullmatch(
+            str(account.get("handle"))
+        ):
+            fail(f"{where}: account.handle must be canonical display text")
         profile_url = account.get("profile_url")
         host = account.get("host")
-        if not _safe_profile_url(profile_url, host):
-            fail(f"{where}: account.profile_url must be an https URL on the declared host")
+        handle = account.get("handle")
+        if not _safe_profile_url(profile_url, host, handle):
+            fail(f"{where}: account.profile_url must be the canonical profile URL")
         identity = (
             str(account.get("provider")),
             str(host),
@@ -682,10 +922,34 @@ def _validate_named_public(data: dict, label: str) -> None:
         if identity in seen_accounts:
             fail(f"{where}: duplicate provider/host/account_id entry")
         seen_accounts.add(identity)
-        if not isinstance(measurements, dict) or set(measurements) - {"commit_count_bucket"}:
-            fail(f"{where}: actor measurements must be limited to commit_count_bucket")
-        elif measurements.get("commit_count_bucket") not in BUCKET_VALUES:
-            fail(f"{where}: commit_count_bucket is not a registered bucket")
+        if account.get("provider") != project.get("provider") or account.get(
+            "host"
+        ) != project.get("host"):
+            fail(f"{where}: account provider/host does not match project")
+        evidence = account.get("evidence")
+        if not isinstance(evidence, dict) or set(evidence) != V2_ACCOUNT_EVIDENCE_KEYS:
+            fail(f"{where}: account.evidence is outside the closed shape")
+        elif (
+            evidence.get("basis") not in PUBLIC_ACCOUNT_EVIDENCE_BASES
+            or evidence.get("coverage_status") not in PUBLIC_ACCOUNT_COVERAGE
+            or evidence.get("account_match_status") != "linked"
+        ):
+            fail(f"{where}: account.evidence vocabulary is not registered")
+        if (
+            not isinstance(measurements, dict)
+            or set(measurements) != V2_ACTOR_MEASUREMENT_KEYS
+        ):
+            fail(f"{where}: actor measurements are outside the closed shape")
+        else:
+            for key in ("linked_commit_count_bucket", "actor_commit_count_bucket"):
+                if measurements.get(key) not in COUNT_BUCKETS:
+                    fail(f"{where}: {key} is not a registered count bucket")
+            if measurements.get("linkage_coverage_bucket") not in RATIO_BUCKETS:
+                fail(f"{where}: linkage_coverage_bucket is not a ratio bucket")
+            if measurements.get("commit_count_basis") != NAMED_COMMIT_COUNT_BASIS:
+                fail(f"{where}: commit_count_basis is not registered")
+    if seen_accounts != authority_bindings:
+        fail(f"{label}: authority accounts must exactly bind emitted actor accounts")
 
 
 def main() -> int:
@@ -724,13 +988,17 @@ def main() -> int:
     # from the meta files — regeneration drift is itself a failure
     legacy = Path("manifest.jsonl")
     if legacy.is_file():
-        for lineno, line in enumerate(legacy.read_text(encoding="utf-8").splitlines(), 1):
+        for lineno, line in enumerate(
+            legacy.read_text(encoding="utf-8").splitlines(), 1
+        ):
             if not line.strip():
                 continue
             try:
                 row = _loads_strict(line)
             except ValueError as exc:
-                fail(f"manifest.jsonl:{lineno}: invalid JSON ({exc}) — regenerate on main")
+                fail(
+                    f"manifest.jsonl:{lineno}: invalid JSON ({exc}) — regenerate on main"
+                )
                 continue
             if not isinstance(row, dict):
                 fail(f"manifest.jsonl:{lineno}: row must be a JSON object")
@@ -760,13 +1028,17 @@ def main() -> int:
         schema = payload.get("contribution_schema")
         if schema == V2_SCHEMA:
             if set(payload) - ALLOWED_TOP_V2:
-                fail(f"{f}: unexpected top-level keys {sorted(set(payload) - ALLOWED_TOP_V2)}")
+                fail(
+                    f"{f}: unexpected top-level keys {sorted(set(payload) - ALLOWED_TOP_V2)}"
+                )
             _validate_v2(payload, str(f))
         elif schema == V1_SCHEMA:
             if payload.get("purpose") != V2_PURPOSE:
                 fail(f"{f}: unexpected purpose")
             if set(payload) - ALLOWED_TOP_V1:
-                fail(f"{f}: unexpected top-level keys {sorted(set(payload) - ALLOWED_TOP_V1)}")
+                fail(
+                    f"{f}: unexpected top-level keys {sorted(set(payload) - ALLOWED_TOP_V1)}"
+                )
             prov = payload.get("provenance") or {}
             if set(prov) - ALLOWED_PROV:
                 fail(f"{f}: provenance has unexpected keys")
@@ -776,7 +1048,11 @@ def main() -> int:
             if attribution is not None:
                 if not isinstance(attribution, str) or len(attribution) > 64:
                     fail(f"{f}: attribution must be a display string <=64 chars")
-                if EMAIL_RE.search(attribution) or "http" in attribution or "@" in attribution:
+                if (
+                    EMAIL_RE.search(attribution)
+                    or "http" in attribution
+                    or "@" in attribution
+                ):
                     fail(f"{f}: attribution must not contain emails/urls/@")
             text = json.dumps(payload, ensure_ascii=False)
             if EMAIL_RE.search(text) or "@" in text:
