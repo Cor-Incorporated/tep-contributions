@@ -26,6 +26,21 @@ jobs:
           git push
       - name: Payload schema + manifest + needle sweep
         run: python scripts/validate.py
+      - name: Durable validator security tests
+        run: python -m unittest discover -s tests -v
+      # H5-RETIRE: remove this ledger only after a required successor check has
+      # rejected the same eight cases for 30 consecutive main-branch runs with
+      # zero unsafe acceptances and preserves an always-uploaded audit artifact.
+      - name: Known-accident security ledger
+        if: always()
+        run: python scripts/falsify_security.py --ledger artifacts/guard-ledger.jsonl
+      - name: Upload intake guard evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: intake-guard-ledger
+          path: artifacts/guard-ledger.jsonl
+          if-no-files-found: error
       - name: Falsification self-tests (identifying payloads MUST fail)
         run: |
           set -e

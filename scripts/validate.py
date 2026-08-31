@@ -30,9 +30,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 import sys
+from collections.abc import Iterable
 from pathlib import Path
+from urllib.parse import unquote_plus, urlsplit
 
 ALLOWED_PROV = {
     "tool_name",
@@ -119,6 +122,7 @@ RECEIPT_RE = re.compile(r"^receipt_[a-z2-7]{26}$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 RECEIVED_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}")
 SAFE_TOKEN_RE = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
+PARAMETER_KEY_RE = re.compile(r"(?:^|[?&#;])([^=&#;\s]{1,120})=")
 
 # ---------------------------------------------------------------------------
 # Closed allowlists mirrored from grift-cli src/tep_core/contribution_v2.py.
@@ -235,6 +239,41 @@ AGGREGATE_REASONS = frozenset(_ALLOWLISTS["reasons"])
 _FAILURES: list[str] = []
 
 
+class DuplicateKeyError(ValueError):
+    """Raised when JSON would otherwise silently overwrite a duplicate key."""
+
+
+def _object_no_duplicates(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise DuplicateKeyError(f"duplicate JSON key {key!r}")
+        result[key] = value
+    return result
+
+
+def _reject_non_finite(value: str) -> None:
+    raise ValueError(f"non-finite JSON number {value!r}")
+
+
+def _parse_finite_float(value: str) -> float:
+    parsed = float(value)
+    if not math.isfinite(parsed):
+        raise ValueError(f"non-finite JSON number {value!r}")
+    return parsed
+
+
+def _loads_strict(raw: str) -> object:
+    """Load standards-compliant JSON without lossy duplicate-key handling."""
+
+    return json.loads(
+        raw,
+        object_pairs_hook=_object_no_duplicates,
+        parse_constant=_reject_non_finite,
+        parse_float=_parse_finite_float,
+    )
+
+
 def fail(msg: str) -> None:
     _FAILURES.append(msg)
 
@@ -243,16 +282,138 @@ def _is_str(value: object) -> bool:
     return isinstance(value, str) and value.strip() != ""
 
 
+def _decoded_variants(value: str) -> Iterable[str]:
+    """Yield the original text and a bounded set of percent-decoded forms."""
+
+    candidate = value
+    yield candidate
+    for _ in range(3):
+        decoded = unquote_plus(candidate)
+        if decoded == candidate:
+            return
+        yield decoded
+        candidate = decoded
+
+
+def _credential_field_name(value: object) -> bool:
+    raw = str(value)
+    split_acronyms = re.sub(r"(?<=[A-Z])(?=[A-Z][a-z])", " ", raw)
+    split_camel = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", split_acronyms)
+    words = {
+        re.sub(r"\d+$", "", word.lower())
+        for word in re.findall(r"[A-Za-z0-9]+", split_camel)
+    }
+    credential_words = {
+        "authorization",
+        "auth",
+        "cookie",
+        "credential",
+        "credentials",
+        "csrf",
+        "jwt",
+        "key",
+        "oauth",
+        "passcode",
+        "passphrase",
+        "passwd",
+        "password",
+        "pat",
+        "pwd",
+        "secret",
+        "session",
+        "token",
+    }
+    if words & credential_words:
+        return True
+    collapsed = "".join(words)
+    return (
+        any(
+            marker in collapsed
+            for marker in (
+                "authorization",
+                "authcode",
+                "credential",
+                "password",
+                "passphrase",
+                "privatekey",
+                "secret",
+                "sessiontoken",
+                "token",
+            )
+        )
+        or collapsed.startswith(
+            (
+                "accesskey",
+                "apikey",
+                "authkey",
+                "clientsecret",
+                "keymaterial",
+                "oauth",
+                "privatekey",
+            )
+        )
+        or collapsed.endswith(
+            (
+                "accesskey",
+                "apikey",
+                "authkey",
+                "cookie",
+                "credential",
+                "password",
+                "privatekey",
+                "secret",
+                "token",
+            )
+        )
+    )
+
+
+def _contains_credential_parameter(value: str) -> bool:
+    return any(
+        _credential_field_name(match.group(1))
+        for candidate in _decoded_variants(value)
+        for match in PARAMETER_KEY_RE.finditer(candidate)
+    )
+
+
 def _safe_public_text(value: object, *, allow_url: bool = False) -> bool:
     if not _is_str(value):
         return False
     text = str(value)
-    if EMAIL_RE.search(text) or "@" in text:
+    if _contains_credential_parameter(text):
         return False
-    if not allow_url and ("http://" in text or "https://" in text):
+    for candidate in _decoded_variants(text):
+        if EMAIL_RE.search(candidate) or "@" in candidate:
+            return False
+        if not allow_url and (
+            "http://" in candidate.lower() or "https://" in candidate.lower()
+        ):
+            return False
+        if any(ord(ch) < 0x20 or ord(ch) == 0x7F for ch in candidate):
+            return False
+    return True
+
+
+def _safe_profile_url(value: object, host: object) -> bool:
+    if not _safe_public_text(value, allow_url=True) or not _is_str(host):
         return False
-    if any(ord(ch) < 0x20 or ord(ch) == 0x7F for ch in text):
-        return False
+    expected_host = str(host)
+    for candidate in _decoded_variants(str(value)):
+        try:
+            parsed = urlsplit(candidate)
+        except ValueError:
+            return False
+        if (
+            parsed.scheme != "https"
+            or parsed.hostname != expected_host
+            or parsed.netloc != expected_host
+            or parsed.username is not None
+            or parsed.password is not None
+            or bool(parsed.query)
+            or bool(parsed.fragment)
+            or not parsed.path.startswith("/")
+        ):
+            return False
     return True
 
 
@@ -306,10 +467,6 @@ def _validate_measurement_tree(node: object, label: str, prefix: str) -> None:
             if key in TEXT_ENUMS:
                 if value not in TEXT_ENUMS[key]:
                     fail(f"{label}: unregistered {key} value {value!r} at {where}")
-                continue
-            if key.endswith("_bucket"):
-                if value not in BUCKET_VALUES:
-                    fail(f"{label}: unregistered bucket label {value!r} at {where}")
                 continue
             fail(f"{label}: free-form string at {where} is not produced by the transformer")
             continue
@@ -514,14 +671,14 @@ def _validate_named_public(data: dict, label: str) -> None:
             if not _is_str(account.get(key)) or not SAFE_TOKEN_RE.fullmatch(str(account.get(key))):
                 fail(f"{where}: account.{key} must be a safe public token")
         profile_url = account.get("profile_url")
-        host = str(account.get("host"))
-        if (
-            not _is_str(profile_url)
-            or not str(profile_url).startswith(f"https://{host}/")
-            or not _safe_public_text(profile_url, allow_url=True)
-        ):
+        host = account.get("host")
+        if not _safe_profile_url(profile_url, host):
             fail(f"{where}: account.profile_url must be an https URL on the declared host")
-        identity = (str(account.get("provider")), host, str(account.get("account_id")))
+        identity = (
+            str(account.get("provider")),
+            str(host),
+            str(account.get("account_id")),
+        )
         if identity in seen_accounts:
             fail(f"{where}: duplicate provider/host/account_id entry")
         seen_accounts.add(identity)
@@ -545,13 +702,19 @@ def main() -> int:
         meta_path = f.parent / f"{f.stem}.meta.json"
         if not meta_path.is_file():
             fail(f"{f}: missing sidecar {f.stem}.meta.json")
+            continue
         try:
-            row = json.loads(meta_path.read_text(encoding="utf-8"))
-        except json.JSONDecodeError as exc:
+            row = _loads_strict(meta_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, ValueError) as exc:
             fail(f"{meta_path}: invalid JSON ({exc})")
-        for key in ("id", "sha256", "received_at", "door"):
-            if key not in row:
-                fail(f"{meta_path}: missing {key}")
+            continue
+        if not isinstance(row, dict):
+            fail(f"{meta_path}: metadata must be a JSON object")
+            continue
+        missing = sorted({"id", "sha256", "received_at", "door"} - set(row))
+        if missing:
+            fail(f"{meta_path}: missing keys {missing}")
+            continue
         if row["door"] not in ("pr", "private"):
             fail(f"{meta_path}: door must be 'pr' or 'private'")
         if not RECEIVED_RE.match(str(row["received_at"])):
@@ -565,9 +728,13 @@ def main() -> int:
             if not line.strip():
                 continue
             try:
-                row = json.loads(line)
-            except json.JSONDecodeError as exc:
+                row = _loads_strict(line)
+            except ValueError as exc:
                 fail(f"manifest.jsonl:{lineno}: invalid JSON ({exc}) — regenerate on main")
+                continue
+            if not isinstance(row, dict):
+                fail(f"manifest.jsonl:{lineno}: row must be a JSON object")
+                continue
             if row.get("id") not in manifest:
                 fail(
                     f"manifest.jsonl:{lineno}: id {row.get('id')!r} has no payload/meta; regenerate on main"
@@ -576,9 +743,12 @@ def main() -> int:
     for f in payloads:
         raw = f.read_text(encoding="utf-8")
         try:
-            payload = json.loads(raw)
-        except json.JSONDecodeError as exc:
+            payload = _loads_strict(raw)
+        except ValueError as exc:
             fail(f"{f}: invalid JSON ({exc})")
+            continue
+        if not isinstance(payload, dict):
+            fail(f"{f}: contribution payload must be a JSON object")
             continue
         sub_id = f.stem
         if sub_id not in manifest:
