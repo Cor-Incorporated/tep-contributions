@@ -15,7 +15,7 @@ except ModuleNotFoundError:
     import validate as validator  # type: ignore[no-redef]
 
 
-NAMED_DIGEST = "sha256:d6f759617a832b2ca7bf4a12e7808d44ca6e5d38ab9b2f406048e3e5bb207baa"
+NAMED_DIGEST = "sha256:487946510eceed0c3d85bf054d26f783f858dc7aae97bbbb467f94d672cb6982"
 
 
 def named_payload() -> dict[str, object]:
@@ -135,6 +135,31 @@ def _known_accidents() -> list[tuple[str, Callable[[], list[str]]]]:
                 "non-finite-json-number",
                 lambda: _strict_json_failures('{"value":NaN}'),
             ),
+        )
+    )
+    gitlab_linkage = named_payload()
+    gitlab_linkage["data"]["project"].update(
+        {"provider": "gitlab", "host": "gitlab.com"}
+    )
+    gitlab_linkage["data"]["authority"]["accounts"][0].update(
+        {"provider": "gitlab", "host": "gitlab.com"}
+    )
+    gitlab_linkage["data"]["actors"][0]["account"].update(
+        {
+            "provider": "gitlab",
+            "host": "gitlab.com",
+            "profile_url": "https://gitlab.com/example-handle",
+            "evidence": {
+                "basis": "provider_commit_account",
+                "coverage_status": "complete",
+                "account_match_status": "linked",
+            },
+        }
+    )
+    checks.append(
+        (
+            "gitlab-account-linkage-unsupported",
+            lambda: _payload_failures(gitlab_linkage),
         )
     )
     for name, mutate in (

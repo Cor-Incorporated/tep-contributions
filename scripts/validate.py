@@ -18,8 +18,11 @@ for tep-contribution-v2 public profiles; hardened 2026-08-31 review):
   the public profile carries buckets only, never exact counts.
 - Any key from the forbidden-judgment vocabulary (score, rank, fit, hire,
   verdict, ...) is rejected at every depth of a v2 payload.
-- named-public may carry provider-neutral project/account references, but
-  raw emails, git OIDs (40/64-hex), actor rows, and unknown keys still fail.
+- named-public keeps a provider-neutral shape, but v0.6 accepts account
+  linkage only for GitHub's documented top-level commit author.id. GitLab
+  repository observations remain supported while account linkage is
+  unsupported/not-proven. Raw emails, git OIDs (40/64-hex), internal actor
+  rows, and unknown keys still fail.
 - manifest.jsonl has exactly one matching line per payload
   (id, sha256, received_at ISO, door in {pr, private})
 
@@ -181,7 +184,7 @@ HIGH_CONFIDENCE_TOKEN_RE = re.compile(
 # ---------------------------------------------------------------------------
 TRANSFORMATION_SPEC_DIGESTS = {
     "aggregate": "sha256:559265d4d765abb19de629329c3424d3b2fdb633fe45abbe9d964b651f3f5d04",
-    "named-public": "sha256:d6f759617a832b2ca7bf4a12e7808d44ca6e5d38ab9b2f406048e3e5bb207baa",
+    "named-public": "sha256:487946510eceed0c3d85bf054d26f783f858dc7aae97bbbb467f94d672cb6982",
 }
 SOURCE_REPLAY_BY_PROFILE = {
     "aggregate": "unavailable_from_public_payload",
@@ -190,10 +193,9 @@ SOURCE_REPLAY_BY_PROFILE = {
 NAMED_AUTHORITY_BASIS = "account_holder_explicit"
 NAMED_AUTHORITY_SCOPE = "project_and_account"
 NAMED_AUTHORITY_ASSERTION = "authorized_for_public_research_contribution"
-PUBLIC_ACCOUNT_EVIDENCE_BASES = {
-    "commit.author.id",
-    "commit_sha_to_account",
-    "provider_commit_account",
+PUBLIC_ACCOUNT_EVIDENCE_BY_PROVIDER = {
+    "github": {"commit.author.id"},
+    "gitlab": set(),
 }
 PUBLIC_ACCOUNT_COVERAGE = {"complete", "partial"}
 NAMED_COMMIT_COUNT_BASIS = "git_primary_author_cluster_including_merges"
@@ -312,7 +314,10 @@ if not isinstance(_named_allowlist, dict) or _named_allowlist != {
     "authority_basis": NAMED_AUTHORITY_BASIS,
     "authority_scope": NAMED_AUTHORITY_SCOPE,
     "authority_assertion": NAMED_AUTHORITY_ASSERTION,
-    "account_evidence_bases": sorted(PUBLIC_ACCOUNT_EVIDENCE_BASES),
+    "account_evidence_by_provider": {
+        provider: sorted(bases)
+        for provider, bases in sorted(PUBLIC_ACCOUNT_EVIDENCE_BY_PROVIDER.items())
+    },
     "coverage_statuses": sorted(PUBLIC_ACCOUNT_COVERAGE),
     "commit_count_basis": NAMED_COMMIT_COUNT_BASIS,
     "max_accounts": 1,
@@ -830,6 +835,8 @@ def _validate_named_public(data: dict, label: str) -> None:
             fail(f"{label}: named-public project.project_id is not canonical")
         if not _safe_project_path(project.get("project_path")):
             fail(f"{label}: named-public project.project_path is not canonical")
+        if not PUBLIC_ACCOUNT_EVIDENCE_BY_PROVIDER.get(str(project.get("provider"))):
+            fail(f"{label}: account linkage is unsupported for this provider")
     authority = data.get("authority")
     if not isinstance(authority, dict) or set(authority) != V2_AUTHORITY_KEYS:
         fail(
@@ -930,7 +937,10 @@ def _validate_named_public(data: dict, label: str) -> None:
         if not isinstance(evidence, dict) or set(evidence) != V2_ACCOUNT_EVIDENCE_KEYS:
             fail(f"{where}: account.evidence is outside the closed shape")
         elif (
-            evidence.get("basis") not in PUBLIC_ACCOUNT_EVIDENCE_BASES
+            evidence.get("basis")
+            not in PUBLIC_ACCOUNT_EVIDENCE_BY_PROVIDER.get(
+                str(account.get("provider")), set()
+            )
             or evidence.get("coverage_status") not in PUBLIC_ACCOUNT_COVERAGE
             or evidence.get("account_match_status") != "linked"
         ):

@@ -19,7 +19,7 @@ VALIDATOR = ROOT / "scripts" / "validate.py"
 FALSIFIER = ROOT / "scripts" / "falsify_security.py"
 WORKFLOW = ROOT / ".github" / "workflows" / "validate.yml"
 SCHEMA = ROOT / "schemas" / "tep-contribution-v2-public.schema.json"
-PRODUCER_FIXTURES = ROOT / "tests" / "fixtures" / "grift-cli-1f8f4fe"
+PRODUCER_FIXTURES = ROOT / "tests" / "fixtures" / "grift-cli-v060-contract"
 
 
 class ValidatorSecurityTests(unittest.TestCase):
@@ -146,7 +146,7 @@ class ValidatorSecurityTests(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             rows = [json.loads(line) for line in ledger.read_text().splitlines()]
-        self.assertEqual(len(rows), 17)
+        self.assertEqual(len(rows), 18)
         self.assertEqual(
             [row["case"] for row in rows], sorted(row["case"] for row in rows)
         )
@@ -292,6 +292,30 @@ class ValidatorSecurityTests(unittest.TestCase):
                 result = self.run_payload(payload)
                 self.assertNotEqual(result.returncode, 0, result.stdout)
                 self.assertIn("controlled-study artifact", result.stdout)
+
+    def test_gitlab_account_linkage_is_unsupported_even_with_matching_authority(
+        self,
+    ) -> None:
+        payload = named_payload()
+        payload["data"]["project"].update({"provider": "gitlab", "host": "gitlab.com"})
+        payload["data"]["authority"]["accounts"][0].update(
+            {"provider": "gitlab", "host": "gitlab.com"}
+        )
+        payload["data"]["actors"][0]["account"].update(
+            {
+                "provider": "gitlab",
+                "host": "gitlab.com",
+                "profile_url": "https://gitlab.com/example-handle",
+                "evidence": {
+                    "basis": "provider_commit_account",
+                    "coverage_status": "complete",
+                    "account_match_status": "linked",
+                },
+            }
+        )
+        result = self.run_payload(payload)
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("account linkage is unsupported", result.stdout)
 
 
 if __name__ == "__main__":

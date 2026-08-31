@@ -1,8 +1,8 @@
 {
- "_source": "Mirrored from grift-cli commit 1f8f4fe src/tep_core/contribution_v2.py. grift-cli-dev CI executes real producer payloads against this exact receiver contract.",
+ "_source": "Versioned v0.6 intake contract mirror. Exact sender and receiver commits are proven only by the executable cross-repository CI gate.",
  "transformation_spec_digests": {
   "aggregate": "sha256:559265d4d765abb19de629329c3424d3b2fdb633fe45abbe9d964b651f3f5d04",
-  "named-public": "sha256:d6f759617a832b2ca7bf4a12e7808d44ca6e5d38ab9b2f406048e3e5bb207baa"
+  "named-public": "sha256:487946510eceed0c3d85bf054d26f783f858dc7aae97bbbb467f94d672cb6982"
  },
  "source_replay_by_profile": {
   "aggregate": "unavailable_from_public_payload",
@@ -12,11 +12,10 @@
   "authority_basis": "account_holder_explicit",
   "authority_scope": "project_and_account",
   "authority_assertion": "authorized_for_public_research_contribution",
-  "account_evidence_bases": [
-   "commit.author.id",
-   "commit_sha_to_account",
-   "provider_commit_account"
-  ],
+  "account_evidence_by_provider": {
+   "github": ["commit.author.id"],
+   "gitlab": []
+  },
   "coverage_statuses": ["complete", "partial"],
   "commit_count_basis": "git_primary_author_cluster_including_merges",
   "max_accounts": 1

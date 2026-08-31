@@ -5,11 +5,11 @@
       {
         "account": {
           "account_id": "42",
-          "evidence": {"account_match_status": "linked", "basis": "provider_commit_account", "coverage_status": "partial"},
+          "evidence": {"account_match_status": "linked", "basis": "commit.author.id", "coverage_status": "partial"},
           "handle": "alice",
-          "host": "gitlab.example",
-          "profile_url": "https://gitlab.example/alice",
-          "provider": "gitlab"
+          "host": "github.example",
+          "profile_url": "https://github.example/alice",
+          "provider": "github"
         },
         "measurements": {
           "actor_commit_count_bucket": "100-499",
@@ -25,9 +25,9 @@
           "account_id": "42",
           "assertion": "authorized_for_public_research_contribution",
           "basis": "account_holder_explicit",
-          "host": "gitlab.example",
-          "project_id": "gid://gitlab/Project/7",
-          "provider": "gitlab",
+          "host": "github.example",
+          "project_id": "R_kgDO7",
+          "provider": "github",
           "scope": "project_and_account"
         }
       ]
@@ -71,12 +71,12 @@
       {"kind": "suppressed", "path": "activity", "reason": "unregistered_text"},
       {"kind": "suppressed", "path": "attribution", "reason": "unregistered_text"}
     ],
-    "project": {"host": "gitlab.example", "project_id": "gid://gitlab/Project/7", "project_path": "acme/public", "provider": "gitlab"}
+    "project": {"host": "github.example", "project_id": "R_kgDO7", "project_path": "acme/public", "provider": "github"}
   },
   "door": "public-pr",
   "policy": {"access_class": "public", "public_payload": true, "source_replay": "public_api_recollect_required"},
   "privacy_profile": "named-public",
   "provenance_receipt_id": "receipt_bbbbbbbbbbbbbbbbbbbbbbbbbb",
   "purpose": "TEP Report 集計と参照分布 vNext",
-  "transformation_spec_digest": "sha256:d6f759617a832b2ca7bf4a12e7808d44ca6e5d38ab9b2f406048e3e5bb207baa"
+  "transformation_spec_digest": "sha256:487946510eceed0c3d85bf054d26f783f858dc7aae97bbbb467f94d672cb6982"
 }
