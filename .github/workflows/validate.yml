@@ -60,3 +60,83 @@ jobs:
             echo "falsification OK ($cid rejected):"
             tail -1 "/tmp/neg/$cid.txt"
           done
+      - name: v2 intake self-tests (aggregate/named-public accepted; leaks rejected)
+        run: |
+          set -e
+          rm -rf /tmp/v2t && mkdir -p /tmp/v2t/payloads/2026
+          python3 - << 'PYEOF'
+          import json, hashlib, pathlib
+          def v2(profile, data, door="public-pr", extra=None):
+              payload = {
+                "contribution_schema": "tep-contribution-v2",
+                "privacy_profile": profile,
+                "door": door,
+                "purpose": "TEP Report 集計と参照分布 vNext",
+                "provenance_receipt_id": "receipt_abcdefghijklmnopqrstuvwxyz",
+                "transformation_spec_digest": "a"*64,
+                "policy": {"access_class": "public", "public_payload": True,
+                           "source_replay": "controlled_sidecar_required"},
+                "data": data,
+              }
+              if extra:
+                  payload.update(extra)
+              return payload
+          agg_data = {"population": {"commit_count": "20-99"},
+                      "measurements": {"activity": {"commit_count_bucket": {"kind": "observed", "value": "20-99"}}},
+                      "coverage": {"git": {"kind": "observed", "provided": True}},
+                      "missingness": []}
+          np_actor = {"account": {"provider": "github", "host": "github.com",
+                                  "account_id": "12345678", "handle": "example-handle",
+                                  "profile_url": "https://github.com/example-handle"},
+                      "measurements": {"commit_count_bucket": "20-99"}}
+          np_data = {"project": {"provider": "github", "host": "github.com",
+                                 "project_id": "123456789", "project_path": "example/project"},
+                     "authority": {"basis": "provider-public-api", "scope": "account",
+                                   "assertion": "stable numeric account id"},
+                     "actors": [np_actor],
+                     "measurements": agg_data["measurements"],
+                     "coverage": agg_data["coverage"],
+                     "missingness": []}
+          cases = {
+            "v2t-aggregate-ok": v2("aggregate", agg_data),
+            "v2t-named-public-ok": v2("named-public", np_data),
+            "v2t-masked-rejected": v2("masked", agg_data),
+            "v2t-raw-rejected": v2("raw", agg_data),
+            "v2t-wrong-door": v2("aggregate", agg_data, door="local"),
+            "v2t-oid-leak": v2("aggregate",
+                {**agg_data, "coverage": {"git": {"kind": "observed", "provided": True,
+                                                  "note": "head " + "a"*40}}}),
+            "v2t-email-leak": v2("named-public",
+                {**np_data, "authority": {**np_data["authority"], "assertion": "someone@example.com"}}),
+            "v2t-unknown-key": v2("aggregate", agg_data, extra={"surprise": 1}),
+          }
+          rows = []
+          for cid, payload in cases.items():
+              p = pathlib.Path(f"/tmp/v2t/payloads/2026/{cid}.json")
+              p.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+              d = hashlib.sha256(p.read_text(encoding="utf-8").encode()).hexdigest()
+              meta = {"id": cid, "sha256": d, "received_at": "2026-08-31T00:00:00Z", "door": "pr"}
+              (p.parent / f"{cid}.meta.json").write_text(json.dumps(meta), encoding="utf-8")
+              rows.append(json.dumps(meta))
+          pathlib.Path("/tmp/v2t/manifest.jsonl").write_text("\n".join(rows) + "\n", encoding="utf-8")
+          PYEOF
+          cd /tmp/v2t
+          if python3 "$GITHUB_WORKSPACE/scripts/validate.py" > /tmp/v2t/all.txt 2>&1; then
+            echo "v2 positive cases accepted:"
+            grep "^OK" /tmp/v2t/all.txt
+          else
+            echo "::error::validator rejected valid v2 public payloads"
+            cat /tmp/v2t/all.txt; exit 1
+          fi
+          for must_fail in v2t-masked-rejected v2t-raw-rejected v2t-wrong-door v2t-oid-leak v2t-email-leak v2t-unknown-key; do
+            rm -rf /tmp/v2n && cp -r /tmp/v2t /tmp/v2n
+            find /tmp/v2n/payloads -name "${must_fail}.meta.json" -delete
+            find /tmp/v2n/payloads -name "*.json" ! -name "*.meta.json" ! -name "${must_fail}.json" -delete
+            grep -v "\"$must_fail\"" /tmp/v2t/manifest.jsonl > /tmp/v2n/manifest.jsonl || true
+            if python3 "$GITHUB_WORKSPACE/scripts/validate.py" > "/tmp/v2n/$must_fail.txt" 2>&1; then
+              echo "::error::validator accepted forbidden v2 payload $must_fail — falsification failed"
+              cat "/tmp/v2n/$must_fail.txt"; exit 1
+            fi
+            echo "v2 falsification OK ($must_fail rejected):"
+            grep "VALIDATION FAIL" "/tmp/v2n/$must_fail.txt" | head -1
+          done
