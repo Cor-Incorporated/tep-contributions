@@ -60,20 +60,23 @@ jobs:
             echo "falsification OK ($cid rejected):"
             tail -1 "/tmp/neg/$cid.txt"
           done
-      - name: v2 intake self-tests (aggregate/named-public accepted; leaks rejected)
+      - name: v2 intake self-tests (real-shaped positives; poisons rejected)
         run: |
           set -e
           rm -rf /tmp/v2t /tmp/v2n && mkdir -p /tmp/v2t/payloads/2026
           python3 - << 'PYEOF'
           import json, hashlib, pathlib
-          def v2(profile, data, door="public-pr", extra=None):
+          # The digest emitted by the grift CLI transformer. The validator
+          # pins this exact value; a fabricated digest must be rejected.
+          REAL_DIGEST = "sha256:42eb35f299c3d97490b459c590279b5a28e0790c393a6ac075f21e89e6b8f502"
+          def v2(profile, data, door="public-pr", extra=None, digest=REAL_DIGEST):
               payload = {
                 "contribution_schema": "tep-contribution-v2",
                 "privacy_profile": profile,
                 "door": door,
                 "purpose": "TEP Report 集計と参照分布 vNext",
                 "provenance_receipt_id": "receipt_abcdefghijklmnopqrstuvwxyz",
-                "transformation_spec_digest": "a"*64,
+                "transformation_spec_digest": digest,
                 "policy": {"access_class": "public", "public_payload": True,
                            "source_replay": "controlled_sidecar_required"},
                 "data": data,
@@ -81,10 +84,37 @@ jobs:
               if extra:
                   payload.update(extra)
               return payload
-          agg_data = {"population": {"commit_count": "20-99"},
-                      "measurements": {"activity": {"commit_count_bucket": {"kind": "observed", "value": "20-99"}}},
-                      "coverage": {"git": {"kind": "observed", "provided": True}},
-                      "missingness": []}
+          # Real aggregate shape produced by the grift CLI (bucketed only).
+          real_measurements = {
+            "attribution": {
+              "attributed_commit_count_bucket": "100-499",
+              "attribution_coverage": {"kind": "observed", "sample_size_bucket": "100-499",
+                                       "unit": "ratio", "value_bucket": "90-100%"},
+              "bot_count_bucket": "0",
+              "human_commit_count_bucket": "100-499",
+              "merge_count_bucket": "100-499",
+              "observed_actor_count_bucket": "20-99",
+              "public_join": {"matched_bucket": "0", "unmatched_bucket": "0"},
+              "repo_human_nonmerge_commits_bucket": "100-499",
+            }
+          }
+          real_coverage = {
+            "event_window": {"kind": "not_observed", "reason": "unregistered_reason"},
+            "forge": {"kind": "not_observed", "provided": False, "reason": "forge_export_not_provided"},
+            "git": {"kind": "observed", "provided": True},
+            "public_forge": {"kind": "not_observed", "reason": "public_evidence_not_provided"},
+            "tracker": {"kind": "not_observed", "provided": False, "reason": "tracker_export_not_provided"},
+            "tracker_window": {"kind": "not_observed", "reason": "tracker_export_not_provided"},
+            "window_alignment": {"kind": "not_observed", "reason": "event_window_not_provided"},
+          }
+          real_missingness = [
+            {"path": "attribution", "kind": "suppressed", "reason": "unregistered_text"},
+            {"path": "input_coverage", "kind": "suppressed", "reason": "unregistered_reason"},
+          ]
+          agg_data = {"population": {"n_bucket": "20-99", "denominator_bucket": "0"},
+                      "measurements": real_measurements,
+                      "coverage": real_coverage,
+                      "missingness": real_missingness}
           np_actor = {"account": {"provider": "github", "host": "github.com",
                                   "account_id": "12345678", "handle": "example-handle",
                                   "profile_url": "https://github.com/example-handle"},
@@ -94,12 +124,30 @@ jobs:
                      "authority": {"basis": "provider-public-api", "scope": "account",
                                    "assertion": "stable numeric account id"},
                      "actors": [np_actor],
-                     "measurements": agg_data["measurements"],
-                     "coverage": agg_data["coverage"],
-                     "missingness": []}
+                     "measurements": real_measurements,
+                     "coverage": real_coverage,
+                     "missingness": real_missingness}
+          # Reviewer poison (2026-08-31): fabricated judgment keys, fake digest,
+          # and an arbitrary measurement body must all be rejected.
+          poison_data = {"population": {"n_bucket": "20-99", "denominator_bucket": "0"},
+                         "measurements": {"attribution": {
+                             "fabricated_reputation_score": {"score": 9999, "verdict": "hire"},
+                             "commit_count": 12345}},
+                         "coverage": real_coverage,
+                         "missingness": real_missingness}
+          judgment_nested = {**agg_data,
+                             "measurements": {"attribution": {"public_join": {
+                                 "score": "99", "verdict": "hire", "matched_bucket": "0"}}}}
           cases = {
-            "v2t-aggregate-ok": v2("aggregate", agg_data),
+            "v2t-aggregate-real": v2("aggregate", agg_data),
             "v2t-named-public-ok": v2("named-public", np_data),
+            "v2t-review-poison": v2("aggregate", poison_data, digest="a"*64),
+            "v2t-fake-digest": v2("aggregate", agg_data, digest="b"*64),
+            "v2t-judgment-nested": v2("aggregate", judgment_nested),
+            "v2t-raw-number": v2("aggregate", {**agg_data,
+                "measurements": {"attribution": {"merge_count": 54}}}),
+            "v2t-unregistered-section": v2("aggregate", {**agg_data,
+                "measurements": {"sentiment": {"kind": "observed"}}}),
             "v2t-masked-rejected": v2("masked", agg_data),
             "v2t-raw-rejected": v2("raw", agg_data),
             "v2t-wrong-door": v2("aggregate", agg_data, door="local"),
@@ -122,7 +170,7 @@ jobs:
           # Positives must be accepted in isolation: the validator's exit code
           # is global over a directory, so any co-located negative would
           # falsely reject a valid positive.
-          for positive in v2t-aggregate-ok v2t-named-public-ok; do
+          for positive in v2t-aggregate-real v2t-named-public-ok; do
             rm -rf /tmp/v2p && mkdir -p /tmp/v2p/payloads/2026
             cp /tmp/v2t/payloads/2026/$positive.json /tmp/v2p/payloads/2026/
             cp /tmp/v2t/payloads/2026/$positive.meta.json /tmp/v2p/payloads/2026/
@@ -134,7 +182,7 @@ jobs:
               cat "/tmp/v2p/$positive.txt"; exit 1
             fi
           done
-          for must_fail in v2t-masked-rejected v2t-raw-rejected v2t-wrong-door v2t-oid-leak v2t-email-leak v2t-unknown-key; do
+          for must_fail in v2t-review-poison v2t-fake-digest v2t-judgment-nested v2t-raw-number v2t-unregistered-section v2t-masked-rejected v2t-raw-rejected v2t-wrong-door v2t-oid-leak v2t-email-leak v2t-unknown-key; do
             rm -rf /tmp/v2n && mkdir -p /tmp/v2n/payloads/2026
             cp /tmp/v2t/payloads/2026/$must_fail.json /tmp/v2n/payloads/2026/
             cp /tmp/v2t/payloads/2026/$must_fail.meta.json /tmp/v2n/payloads/2026/

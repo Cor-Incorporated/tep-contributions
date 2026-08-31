@@ -2,14 +2,23 @@
 """Validate contribution PRs: v1 + v2 public-profile schema + no-private rails.
 
 Enforces (ruling 2026-08-23, two-doors/one-corpus intake; extended 2026-08-31
-for tep-contribution-v2 public profiles):
+for tep-contribution-v2 public profiles; hardened 2026-08-31 review):
 - payload lives at payloads/<year>/<submission-id>.json
 - v1: schema/purpose/scope checks + needle sweep (emails, actors arrays,
   paths, repo-name fields, any '@')
 - v2: privacy_profile must be a PUBLIC profile (aggregate / named-public) and
   door must be public-pr. masked/raw are controlled-study artifacts and are
   a hard error at this intake until a controlled destination is authorized.
-  named-public may carry provider-neutral project/account references, but
+- v2 transformation_spec_digest must equal the digest emitted by the grift
+  CLI (single embedded constant, cross-checked by grift-cli-dev CI against
+  src/tep_core/contribution_v2.py).
+- v2 measurement sections, field keys, bucket labels, coverage sources,
+  missingness reasons, and text enums are validated against the closed
+  allowlists mirrored from the CLI transformer. Raw numbers are rejected:
+  the public profile carries buckets only, never exact counts.
+- Any key from the forbidden-judgment vocabulary (score, rank, fit, hire,
+  verdict, ...) is rejected at every depth of a v2 payload.
+- named-public may carry provider-neutral project/account references, but
   raw emails, git OIDs (40/64-hex), actor rows, and unknown keys still fail.
 - manifest.jsonl has exactly one matching line per payload
   (id, sha256, received_at ISO, door in {pr, private})
@@ -64,8 +73,6 @@ V2_AUTHORITY_KEYS = {"basis", "scope", "assertion"}
 V2_ACCOUNT_KEYS = {"provider", "host", "account_id", "handle", "profile_url"}
 V2_ACTOR_KEYS = {"account", "measurements"}
 FORBIDDEN_KEYS = {"canonical_id", "actor", "actors", "emails", "path", "repo", "repository", "name"}
-# In v2 the listed keys are structurally validated instead of blanket-banned:
-# "actors"/"project*"/"account*" are checked against closed shapes below.
 FORBIDDEN_KEYS_V2 = {
     "canonical_id",
     "emails",
@@ -76,6 +83,34 @@ FORBIDDEN_KEYS_V2 = {
     "remote",
     "oid",
 }
+# Review hardening: judgment vocabulary must never enter the corpus, at any
+# depth. Same family as grift-cli scripts/check_forbidden_vocab.py.
+FORBIDDEN_JUDGMENT_KEYS = {
+    "score",
+    "scores",
+    "rank",
+    "ranking",
+    "fit",
+    "fitness",
+    "hire",
+    "hiring",
+    "verdict",
+    "recommendation",
+    "recommendations",
+    "overall",
+    "rating",
+    "grade",
+    "percentile",
+    "percentile_rank",
+    "seniority",
+    "reputation",
+    "reputation_score",
+    "quality_score",
+    "competence",
+    "productivity_score",
+    "performance",
+    "badge",
+}
 EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 PATHLIKE_RE = re.compile(r"(^|[\s\"'])(/[\w.-]+){2,}|([A-Za-z]:\\\\)")
 HEX40_RE = re.compile(r"\b[0-9a-f]{40}\b")
@@ -84,6 +119,117 @@ RECEIPT_RE = re.compile(r"^receipt_[a-z2-7]{26}$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 RECEIVED_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}")
 SAFE_TOKEN_RE = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
+
+# ---------------------------------------------------------------------------
+# Closed allowlists mirrored from grift-cli src/tep_core/contribution_v2.py.
+# grift-cli-dev CI verifies these constants still match the CLI (see
+# .github/workflows/ci.yml "intake-contract-parity" job). Update both sides
+# in one coordinated change; a silent drift fails that job.
+# ---------------------------------------------------------------------------
+TRANSFORMATION_SPEC_DIGEST = (
+    "sha256:42eb35f299c3d97490b459c590279b5a28e0790c393a6ac075f21e89e6b8f502"
+)
+MEASUREMENT_SECTIONS = frozenset(
+    {
+        "activity",
+        "attribution",
+        "change_rhythm",
+        "context_profile",
+        "coordination_profile",
+        "event_observation",
+        "event_rhythm",
+        "experience",
+        "role_lens",
+        "role_profile",
+        "surface_profile",
+        "tracker_lifecycle",
+        "verification_profile",
+    }
+)
+AGGREGATE_COVERAGE_SOURCES = frozenset(
+    {
+        "event_window",
+        "forge",
+        "forge_tracker_window_alignment",
+        "git",
+        "git_window",
+        "public_forge",
+        "report",
+        "tracker",
+        "tracker_window",
+        "window_alignment",
+    }
+)
+MISSINGNESS_KINDS = frozenset({"not_observed", "not_proven", "not_declared", "suppressed"})
+MISSINGNESS_PATHS = MEASUREMENT_SECTIONS | {"input_coverage"}
+COVERAGE_KINDS = frozenset({"observed", "not_observed", "not_proven"})
+COUNT_BUCKETS = frozenset({"0", "1-4", "5-19", "20-99", "100-499", "500-1999", "2000+"})
+RATIO_BUCKETS = frozenset(f"{i:02d}-{i + 10:02d}%" for i in range(0, 100, 10))
+BUCKET_VALUES = COUNT_BUCKETS | RATIO_BUCKETS | {"unknown"}
+TEXT_ENUMS = {
+    "kind": frozenset(
+        {
+            "declared",
+            "directional",
+            "display_preset",
+            "mixed",
+            "not_comparable",
+            "not_declared",
+            "not_observed",
+            "not_proven",
+            "observed",
+            "suppressed",
+        }
+    ),
+    "unit": frozenset(
+        {
+            "boolean",
+            "commit-pairs",
+            "commit_share",
+            "commits",
+            "coverage_status",
+            "date-range",
+            "days",
+            "dimensionless",
+            "events",
+            "file-changes",
+            "files",
+            "hours",
+            "input",
+            "label",
+            "lens",
+            "lines",
+            "month-range",
+            "path_touch_share",
+            "profile",
+            "ratio",
+            "surface",
+            "target_commits",
+            "utc_date_range",
+            "verification-type",
+        }
+    ),
+    "status": frozenset(
+        {
+            "complete",
+            "insufficient_population",
+            "not_available",
+            "not_observed",
+            "not_proven",
+            "partial",
+            "unknown",
+            "unsupported",
+        }
+    ),
+    "classification_basis": frozenset({"path_pattern_and_extension_heuristic"}),
+}
+with (Path(__file__).resolve().parent / "intake_allowlists.json").open(
+    "r", encoding="utf-8"
+) as _allowlist_file:
+    _ALLOWLISTS = json.load(_allowlist_file)
+AGGREGATE_FIELD_KEYS = frozenset(_ALLOWLISTS["aggregate_field_keys"])
+AGGREGATE_VALUE_LABELS = frozenset(_ALLOWLISTS["value_labels"])
+AGGREGATE_REASONS = frozenset(_ALLOWLISTS["reasons"])
 
 
 _FAILURES: list[str] = []
@@ -110,6 +256,158 @@ def _safe_public_text(value: object, *, allow_url: bool = False) -> bool:
     return True
 
 
+def _validate_measurement_tree(node: object, label: str, prefix: str) -> None:
+    """Closed-shape walk over bucketed measurement data.
+
+    Everything numeric must already be a bucket string; raw numbers, lists,
+    unregistered keys, and judgment vocabulary are rejected.
+    """
+
+    if not isinstance(node, dict):
+        fail(f"{label}: unsupported measurement node at {prefix}")
+        return
+    for raw_key, value in node.items():
+        key = str(raw_key)
+        where = f"{prefix}.{key}" if prefix else key
+        lowered = key.lower()
+        if lowered in FORBIDDEN_JUDGMENT_KEYS:
+            fail(f"{label}: forbidden judgment key {key!r} at {where}")
+            continue
+        if lowered in FORBIDDEN_KEYS_V2:
+            fail(f"{label}: forbidden key {key!r} at {where}")
+            continue
+        if key == "value_buckets":
+            _validate_value_buckets(value, label, where)
+            continue
+        if key.endswith("_bucket"):
+            # The transformer emits <registered_field>_bucket dynamically;
+            # the base field must still be registered and the value a bucket.
+            base = key[: -len("_bucket")]
+            if base != "value" and base not in AGGREGATE_FIELD_KEYS:
+                fail(f"{label}: unregistered measurement field {key!r} at {where}")
+                continue
+            if not isinstance(value, str) or value not in BUCKET_VALUES:
+                fail(f"{label}: unregistered bucket label {value!r} at {where}")
+            continue
+        if key not in AGGREGATE_FIELD_KEYS:
+            fail(f"{label}: unregistered measurement field {key!r} at {where}")
+            continue
+        if isinstance(value, bool):
+            if key not in {"provided", "narrate_rate"}:
+                fail(f"{label}: boolean is not allowed at {where}")
+            continue
+        if isinstance(value, (int, float)):
+            fail(f"{label}: raw number at {where}; public profiles carry buckets only")
+            continue
+        if isinstance(value, list):
+            fail(f"{label}: array at {where}; arrays are omitted by the transformer")
+            continue
+        if isinstance(value, str):
+            if key in TEXT_ENUMS:
+                if value not in TEXT_ENUMS[key]:
+                    fail(f"{label}: unregistered {key} value {value!r} at {where}")
+                continue
+            if key.endswith("_bucket"):
+                if value not in BUCKET_VALUES:
+                    fail(f"{label}: unregistered bucket label {value!r} at {where}")
+                continue
+            fail(f"{label}: free-form string at {where} is not produced by the transformer")
+            continue
+        _validate_measurement_tree(value, label, where)
+
+
+def _validate_value_buckets(node: object, label: str, prefix: str) -> None:
+    if not isinstance(node, dict) or not node:
+        fail(f"{label}: value_buckets must be a non-empty object at {prefix}")
+        return
+    for raw_label, bucket in node.items():
+        label_text = str(raw_label)
+        if label_text not in AGGREGATE_VALUE_LABELS:
+            fail(f"{label}: unregistered value-bucket label {label_text!r} at {prefix}")
+            continue
+        if bucket not in BUCKET_VALUES:
+            fail(f"{label}: unregistered bucket {bucket!r} at {prefix}.{label_text}")
+
+
+def _validate_aggregate_measurements(node: object, label: str) -> None:
+    if not isinstance(node, dict) or not node:
+        fail(f"{label}: measurements must be a non-empty object")
+        return
+    for section, body in node.items():
+        if section not in MEASUREMENT_SECTIONS:
+            fail(f"{label}: unregistered measurement section {section!r}")
+            continue
+        _validate_measurement_tree(body, label, str(section))
+
+
+def _validate_aggregate_coverage(node: object, label: str) -> None:
+    if not isinstance(node, dict) or not node:
+        fail(f"{label}: coverage must be a non-empty object")
+        return
+    for source, body in node.items():
+        if source not in AGGREGATE_COVERAGE_SOURCES:
+            fail(f"{label}: unregistered coverage source {source!r}")
+            continue
+        if not isinstance(body, dict) or set(body) - {"kind", "provided", "reason"}:
+            fail(f"{label}: coverage.{source} keys are outside the closed shape")
+            continue
+        if "kind" in body and body["kind"] not in COVERAGE_KINDS:
+            fail(f"{label}: coverage.{source}.kind is not a closed enum value")
+        if "provided" in body and not isinstance(body["provided"], bool):
+            fail(f"{label}: coverage.{source}.provided must be a boolean")
+        if "reason" in body and body["reason"] not in AGGREGATE_REASONS:
+            fail(f"{label}: coverage.{source}.reason is not a registered reason")
+
+
+def _validate_aggregate_missingness(node: object, label: str) -> None:
+    if not isinstance(node, list):
+        fail(f"{label}: missingness must be an array")
+        return
+    for index, row in enumerate(node):
+        where = f"{label}: missingness[{index}]"
+        if not isinstance(row, dict) or set(row) != {"path", "kind", "reason"}:
+            fail(f"{where}: must have exactly path/kind/reason")
+            continue
+        if row["path"] not in MISSINGNESS_PATHS:
+            fail(f"{where}: unregistered path {row['path']!r}")
+        if row["kind"] not in MISSINGNESS_KINDS:
+            fail(f"{where}: unregistered kind {row['kind']!r}")
+        if row["reason"] not in AGGREGATE_REASONS:
+            fail(f"{where}: unregistered reason {row['reason']!r}")
+
+
+def _validate_aggregate_population(node: object, label: str) -> None:
+    if not isinstance(node, dict) or set(node) != {"n_bucket", "denominator_bucket"}:
+        fail(f"{label}: population must have exactly n_bucket/denominator_bucket")
+        return
+    for key, value in node.items():
+        if value not in BUCKET_VALUES:
+            fail(f"{label}: population.{key} is not a registered bucket")
+
+
+def _validate_judgment_free(node: object, label: str, prefix: str = "") -> None:
+    """Reject judgment vocabulary and identity keys at every depth.
+
+    ``path``/``kind``/``reason`` are structurally validated inside the closed
+    measurement/missingness walkers, so only their VALUE vocabulary matters
+    here; the judgment sweep still applies to their contents.
+    """
+
+    if isinstance(node, dict):
+        for raw_key, value in node.items():
+            key = str(raw_key)
+            where = f"{prefix}.{key}" if prefix else key
+            lowered = key.lower()
+            if lowered in FORBIDDEN_JUDGMENT_KEYS:
+                fail(f"{label}: forbidden judgment key {key!r} at {where}")
+            elif lowered in FORBIDDEN_KEYS_V2 and key != "path":
+                fail(f"{label}: forbidden key {key!r} at {where}")
+            _validate_judgment_free(value, label, where)
+    elif isinstance(node, list):
+        for index, item in enumerate(node):
+            _validate_judgment_free(item, label, f"{prefix}[{index}]")
+
+
 def _validate_v2(payload: dict, label: str) -> None:
     profile = payload.get("privacy_profile")
     if profile in V2_CONTROLLED_PROFILES:
@@ -129,8 +427,11 @@ def _validate_v2(payload: dict, label: str) -> None:
     if not _is_str(receipt) or not RECEIPT_RE.fullmatch(str(receipt)):
         fail(f"{label}: provenance_receipt_id must be an opaque receipt id")
     digest = payload.get("transformation_spec_digest")
-    if not _is_str(digest) or not SHA256_RE.fullmatch(str(digest)):
-        fail(f"{label}: transformation_spec_digest must be a sha256 hex digest")
+    if digest != TRANSFORMATION_SPEC_DIGEST:
+        fail(
+            f"{label}: transformation_spec_digest must equal the digest emitted by "
+            "the grift CLI transformer"
+        )
     policy = payload.get("policy")
     if not isinstance(policy, dict) or set(policy) - V2_POLICY_KEYS:
         fail(f"{label}: policy keys are outside the closed v2 policy shape")
@@ -146,10 +447,17 @@ def _validate_v2(payload: dict, label: str) -> None:
                 f"{label}: aggregate data keys must be exactly "
                 f"{sorted(V2_AGGREGATE_DATA)} (no actor rows, repo/remote/OIDs, timestamps)"
             )
+            return
+        _validate_aggregate_population(data.get("population"), label)
     else:
         if set(data) != V2_NAMED_PUBLIC_DATA:
             fail(f"{label}: named-public data keys must be exactly {sorted(V2_NAMED_PUBLIC_DATA)}")
+            return
         _validate_named_public(data, label)
+    _validate_aggregate_measurements(data.get("measurements"), label)
+    _validate_aggregate_coverage(data.get("coverage"), label)
+    _validate_aggregate_missingness(data.get("missingness"), label)
+    _validate_judgment_free(payload, label)
 
     # Global leak sweep for v2: emails anywhere, git-object-shaped hex outside
     # the registered transformation digest, and unregistered URL positions.
@@ -158,10 +466,13 @@ def _validate_v2(payload: dict, label: str) -> None:
         fail(f"{label}: email-shaped string present")
     if PATHLIKE_RE.search(text):
         fail(f"{label}: path-like string present")
-    swept = dict(payload)
-    swept.pop("transformation_spec_digest", None)
-    swept_text = json.dumps(swept, ensure_ascii=False)
-    if HEX40_RE.search(swept_text) or HEX64_RE.search(swept_text):
+    if isinstance(digest, str):
+        swept = text.replace(digest, "")
+        if digest.startswith("sha256:"):
+            swept = swept.replace(digest[len("sha256:") :], "")
+    else:
+        swept = text
+    if HEX40_RE.search(swept) or HEX64_RE.search(swept):
         fail(f"{label}: git-object-shaped hex string present outside the registered digest")
 
 
@@ -216,6 +527,8 @@ def _validate_named_public(data: dict, label: str) -> None:
         seen_accounts.add(identity)
         if not isinstance(measurements, dict) or set(measurements) - {"commit_count_bucket"}:
             fail(f"{where}: actor measurements must be limited to commit_count_bucket")
+        elif measurements.get("commit_count_bucket") not in BUCKET_VALUES:
+            fail(f"{where}: commit_count_bucket is not a registered bucket")
 
 
 def main() -> int:
@@ -306,6 +619,8 @@ def main() -> int:
                     for k, v in node.items():
                         if k in FORBIDDEN_KEYS:
                             fail(f"{f}: forbidden key {k!r} at {prefix}")
+                        if str(k).lower() in FORBIDDEN_JUDGMENT_KEYS:
+                            fail(f"{f}: forbidden judgment key {k!r} at {prefix}")
                         walk(v, f"{prefix}.{k}" if prefix else k)
                 elif isinstance(node, list):
                     for i, item in enumerate(node):
@@ -315,21 +630,6 @@ def main() -> int:
         else:
             fail(f"{f}: contribution_schema must be {V1_SCHEMA} or {V2_SCHEMA}")
             continue
-
-        # Shared closed-key walk for v2 (v1 keeps its own blanket rules above).
-        if schema == V2_SCHEMA:
-
-            def walk_v2(node, prefix=""):
-                if isinstance(node, dict):
-                    for k, v in node.items():
-                        if k in FORBIDDEN_KEYS_V2:
-                            fail(f"{f}: forbidden key {k!r} at {prefix}")
-                        walk_v2(v, f"{prefix}.{k}" if prefix else k)
-                elif isinstance(node, list):
-                    for i, item in enumerate(node):
-                        walk_v2(item, f"{prefix}[{i}]")
-
-            walk_v2(payload)
         if not _FAILURES:
             print(f"OK {f} (door={manifest[sub_id]['door']}, schema={schema})")
     print(f"validated {len(payloads)} payload(s)")
