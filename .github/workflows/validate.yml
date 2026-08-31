@@ -63,7 +63,7 @@ jobs:
       - name: v2 intake self-tests (aggregate/named-public accepted; leaks rejected)
         run: |
           set -e
-          rm -rf /tmp/v2t && mkdir -p /tmp/v2t/payloads/2026
+          rm -rf /tmp/v2t /tmp/v2n && mkdir -p /tmp/v2t/payloads/2026
           python3 - << 'PYEOF'
           import json, hashlib, pathlib
           def v2(profile, data, door="public-pr", extra=None):
@@ -110,29 +110,35 @@ jobs:
                 {**np_data, "authority": {**np_data["authority"], "assertion": "someone@example.com"}}),
             "v2t-unknown-key": v2("aggregate", agg_data, extra={"surprise": 1}),
           }
-          rows = []
           for cid, payload in cases.items():
               p = pathlib.Path(f"/tmp/v2t/payloads/2026/{cid}.json")
               p.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
               d = hashlib.sha256(p.read_text(encoding="utf-8").encode()).hexdigest()
               meta = {"id": cid, "sha256": d, "received_at": "2026-08-31T00:00:00Z", "door": "pr"}
               (p.parent / f"{cid}.meta.json").write_text(json.dumps(meta), encoding="utf-8")
-              rows.append(json.dumps(meta))
-          pathlib.Path("/tmp/v2t/manifest.jsonl").write_text("\n".join(rows) + "\n", encoding="utf-8")
+              with open("/tmp/v2t/all-meta.jsonl", "a", encoding="utf-8") as sink:
+                  sink.write(json.dumps(meta) + "\n")
           PYEOF
-          cd /tmp/v2t
-          if python3 "$GITHUB_WORKSPACE/scripts/validate.py" > /tmp/v2t/all.txt 2>&1; then
-            echo "v2 positive cases accepted:"
-            grep "^OK" /tmp/v2t/all.txt
-          else
-            echo "::error::validator rejected valid v2 public payloads"
-            cat /tmp/v2t/all.txt; exit 1
-          fi
+          # Positives must be accepted in isolation: the validator's exit code
+          # is global over a directory, so any co-located negative would
+          # falsely reject a valid positive.
+          for positive in v2t-aggregate-ok v2t-named-public-ok; do
+            rm -rf /tmp/v2p && mkdir -p /tmp/v2p/payloads/2026
+            cp /tmp/v2t/payloads/2026/$positive.json /tmp/v2p/payloads/2026/
+            cp /tmp/v2t/payloads/2026/$positive.meta.json /tmp/v2p/payloads/2026/
+            grep "\"$positive\"" /tmp/v2t/all-meta.jsonl > /tmp/v2p/manifest.jsonl
+            if python3 "$GITHUB_WORKSPACE/scripts/validate.py" > "/tmp/v2p/$positive.txt" 2>&1; then
+              echo "v2 positive accepted: $positive"
+            else
+              echo "::error::validator rejected valid v2 public payload $positive"
+              cat "/tmp/v2p/$positive.txt"; exit 1
+            fi
+          done
           for must_fail in v2t-masked-rejected v2t-raw-rejected v2t-wrong-door v2t-oid-leak v2t-email-leak v2t-unknown-key; do
-            rm -rf /tmp/v2n && cp -r /tmp/v2t /tmp/v2n
-            find /tmp/v2n/payloads -name "${must_fail}.meta.json" -delete
-            find /tmp/v2n/payloads -name "*.json" ! -name "*.meta.json" ! -name "${must_fail}.json" -delete
-            grep -v "\"$must_fail\"" /tmp/v2t/manifest.jsonl > /tmp/v2n/manifest.jsonl || true
+            rm -rf /tmp/v2n && mkdir -p /tmp/v2n/payloads/2026
+            cp /tmp/v2t/payloads/2026/$must_fail.json /tmp/v2n/payloads/2026/
+            cp /tmp/v2t/payloads/2026/$must_fail.meta.json /tmp/v2n/payloads/2026/
+            grep "\"$must_fail\"" /tmp/v2t/all-meta.jsonl > /tmp/v2n/manifest.jsonl
             if python3 "$GITHUB_WORKSPACE/scripts/validate.py" > "/tmp/v2n/$must_fail.txt" 2>&1; then
               echo "::error::validator accepted forbidden v2 payload $must_fail — falsification failed"
               cat "/tmp/v2n/$must_fail.txt"; exit 1
