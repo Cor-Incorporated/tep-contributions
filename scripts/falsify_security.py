@@ -15,7 +15,7 @@ except ModuleNotFoundError:
     import validate as validator  # type: ignore[no-redef]
 
 
-NAMED_DIGEST = "sha256:487946510eceed0c3d85bf054d26f783f858dc7aae97bbbb467f94d672cb6982"
+NAMED_DIGEST = "sha256:099512050e0d8208c931cfaa81369ec305a87846f6573e51bdcdbb625b88c6c6"
 
 
 def named_payload() -> dict[str, object]:

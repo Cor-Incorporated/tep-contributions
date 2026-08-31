@@ -1,8 +1,8 @@
 {
  "_source": "Versioned v0.6 intake contract mirror. Exact sender and receiver commits are proven only by the executable cross-repository CI gate.",
  "transformation_spec_digests": {
-  "aggregate": "sha256:559265d4d765abb19de629329c3424d3b2fdb633fe45abbe9d964b651f3f5d04",
-  "named-public": "sha256:487946510eceed0c3d85bf054d26f783f858dc7aae97bbbb467f94d672cb6982"
+  "aggregate": "sha256:3e26e0a71411d954e8459b8ae09b14e4b9a6dd6e0433858b5042db0760425366",
+  "named-public": "sha256:099512050e0d8208c931cfaa81369ec305a87846f6573e51bdcdbb625b88c6c6"
  },
  "source_replay_by_profile": {
   "aggregate": "unavailable_from_public_payload",

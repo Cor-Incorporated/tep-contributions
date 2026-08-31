@@ -24,8 +24,8 @@ public intake accepts only the two public ones**:
 
 | profile | accepted here | retained information |
 |---|---|---|
-| `aggregate` | yes (both doors) | bucketed aggregates, n, denominators, coverage, missingness, random receipt id. No actor rows, repo/remote/OIDs, timestamps, source digests. The public payload alone cannot replay or deduplicate the source |
-| `named-public` | yes (both doors) | provider-neutral public project/account references and the author's actor observations. v0.6 accepts only GitHub's documented `commit.author.id` account linkage; GitLab repository observation remains supported while account linkage stays `unsupported/not_proven`. Requires explicit account-holder authority bound to the project/account and coverage. No raw emails, internal actor ids, or pseudonyms |
+| `aggregate` | yes (`public-pr` only) | bucketed measurements, exact n and denominator, coverage, missingness, and a random receipt id. No actor rows, repo/remote/OIDs, timestamps, or source digests. The public payload alone cannot replay or deduplicate the source |
+| `named-public` | yes (`public-pr` only) | provider-neutral public project/account references and the author's actor observations. v0.6 accepts only GitHub's documented `commit.author.id` account linkage; GitLab repository observation remains supported while account linkage stays `unsupported/not_proven`. Requires explicit account-holder authority bound to the project/account and coverage. No raw emails, internal actor ids, or pseudonyms |
 | `masked` | **no (hard error)** | high-fidelity observations with HMAC pseudonyms; requires a controlled-study sidecar |
 | `raw` | **no (hard error)** | raw names/emails/OIDs; research-controlled path only |
 

@@ -40,12 +40,12 @@
       {"kind": "suppressed", "path": "activity", "reason": "unregistered_text"},
       {"kind": "suppressed", "path": "attribution", "reason": "unregistered_text"}
     ],
-    "population": {"denominator_bucket": "100-499", "n_bucket": "1-4"}
+    "population": {"denominator": 3, "n": 1}
   },
   "door": "public-pr",
   "policy": {"access_class": "public", "public_payload": true, "source_replay": "unavailable_from_public_payload"},
   "privacy_profile": "aggregate",
   "provenance_receipt_id": "receipt_aaaaaaaaaaaaaaaaaaaaaaaaaa",
   "purpose": "TEP Report 集計と参照分布 vNext",
-  "transformation_spec_digest": "sha256:559265d4d765abb19de629329c3424d3b2fdb633fe45abbe9d964b651f3f5d04"
+  "transformation_spec_digest": "sha256:3e26e0a71411d954e8459b8ae09b14e4b9a6dd6e0433858b5042db0760425366"
 }

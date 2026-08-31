@@ -183,8 +183,8 @@ HIGH_CONFIDENCE_TOKEN_RE = re.compile(
 # in one coordinated change; a silent drift fails that job.
 # ---------------------------------------------------------------------------
 TRANSFORMATION_SPEC_DIGESTS = {
-    "aggregate": "sha256:559265d4d765abb19de629329c3424d3b2fdb633fe45abbe9d964b651f3f5d04",
-    "named-public": "sha256:487946510eceed0c3d85bf054d26f783f858dc7aae97bbbb467f94d672cb6982",
+    "aggregate": "sha256:3e26e0a71411d954e8459b8ae09b14e4b9a6dd6e0433858b5042db0760425366",
+    "named-public": "sha256:099512050e0d8208c931cfaa81369ec305a87846f6573e51bdcdbb625b88c6c6",
 }
 SOURCE_REPLAY_BY_PROFILE = {
     "aggregate": "unavailable_from_public_payload",
@@ -706,12 +706,15 @@ def _validate_aggregate_missingness(node: object, label: str) -> None:
 
 
 def _validate_aggregate_population(node: object, label: str) -> None:
-    if not isinstance(node, dict) or set(node) != {"n_bucket", "denominator_bucket"}:
-        fail(f"{label}: population must have exactly n_bucket/denominator_bucket")
+    if not isinstance(node, dict) or set(node) != {"n", "denominator"}:
+        fail(f"{label}: population must have exactly n/denominator")
         return
     for key, value in node.items():
-        if value not in BUCKET_VALUES:
-            fail(f"{label}: population.{key} is not a registered bucket")
+        if type(value) is not int or value < 0:
+            fail(f"{label}: population.{key} must be a non-negative integer")
+    if all(type(node[key]) is int and node[key] >= 0 for key in ("n", "denominator")):
+        if node["n"] > node["denominator"]:
+            fail(f"{label}: population.n cannot exceed population.denominator")
 
 
 def _validate_judgment_free(node: object, label: str, prefix: str = "") -> None:

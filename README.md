@@ -17,8 +17,8 @@ v0.6.0 以降の `grift contribute --privacy` は 4 プロファイルを生成�
 
 | profile | このリポジトリへの提出 | 保持する情報 |
 |---|---|---|
-| `aggregate` | 可（公開ドア・身元非公開ドア） | bucket 化集計・n・denominator・coverage・missingness・random receipt ID。Actor 行・repo/remote/OID・時刻・source digest なし。公開 payload 単独では source replay・重複排除不可 |
-| `named-public` | 可（公開ドア・身元非公開ドア） | provider-neutral な公開 project/account 参照と本人Actor観測。v0.6 のaccount linkageはGitHubの文書化済み`commit.author.id`だけを受理し、GitLabはrepo観測を維持しつつ`unsupported/not_proven`。project と account に拘束した本人の明示 authorityとcoverageを必須化。raw email・内部Actor ID・pseudonym なし |
+| `aggregate` | 可（`public-pr` のみ） | bucket 化した測定値、exact n・denominator、coverage・missingness・random receipt ID。Actor 行・repo/remote/OID・時刻・source digest なし。公開 payload 単独では source replay・重複排除不可 |
+| `named-public` | 可（`public-pr` のみ） | provider-neutral な公開 project/account 参照と本人Actor観測。v0.6 のaccount linkageはGitHubの文書化済み`commit.author.id`だけを受理し、GitLabはrepo観測を維持しつつ`unsupported/not_proven`。project と account に拘束した本人の明示 authorityとcoverageを必須化。raw email・内部Actor ID・pseudonym なし |
 | `masked` | **不可（hard error）** | HMAC pseudonym 付き高精度観測。controlled study 用 sidecar が必要 |
 | `raw` | **不可（hard error）** | raw names/emails/OID。研究用 controlled 経路専用 |
 

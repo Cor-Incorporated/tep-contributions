@@ -201,7 +201,7 @@ class ValidatorSecurityTests(unittest.TestCase):
         payload = copy.deepcopy(named_payload())
         payload["privacy_profile"] = "aggregate"
         payload["data"] = {
-            "population": {"n_bucket": "20-99", "denominator_bucket": "20-99"},
+            "population": {"n": 20, "denominator": 20},
             "measurements": {
                 "surface_profile": {
                     "surface_commit_counts": {
@@ -233,6 +233,23 @@ class ValidatorSecurityTests(unittest.TestCase):
                 self.assertEqual(errors, [], [error.message for error in errors])
                 result = self.run_intake(raw)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_aggregate_population_keeps_exact_closed_counts(self) -> None:
+        base = json.loads((PRODUCER_FIXTURES / "aggregate.json").read_text())
+        self.assertEqual(base["data"]["population"], {"n": 1, "denominator": 3})
+        mutations = {
+            "bucketed": {"n_bucket": "1-4", "denominator_bucket": "1-4"},
+            "negative": {"n": -1, "denominator": 3},
+            "boolean": {"n": True, "denominator": 3},
+            "fractional": {"n": 1.5, "denominator": 3},
+            "inverted": {"n": 4, "denominator": 3},
+        }
+        for name, population in mutations.items():
+            with self.subTest(name=name):
+                payload = copy.deepcopy(base)
+                payload["data"]["population"] = population
+                result = self.run_payload(payload)
+                self.assertNotEqual(result.returncode, 0, result.stdout)
 
     def test_profile_digest_and_source_replay_are_bound(self) -> None:
         fixture_names = ("aggregate.json", "named-public.json")

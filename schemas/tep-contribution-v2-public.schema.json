@@ -29,7 +29,7 @@
       "if": {"properties": {"privacy_profile": {"const": "aggregate"}}},
       "then": {
         "properties": {
-          "transformation_spec_digest": {"const": "sha256:559265d4d765abb19de629329c3424d3b2fdb633fe45abbe9d964b651f3f5d04"},
+          "transformation_spec_digest": {"const": "sha256:3e26e0a71411d954e8459b8ae09b14e4b9a6dd6e0433858b5042db0760425366"},
           "policy": {"$ref": "#/$defs/aggregatePolicy"},
           "data": {"$ref": "#/$defs/aggregateData"}
         }
@@ -39,7 +39,7 @@
       "if": {"properties": {"privacy_profile": {"const": "named-public"}}},
       "then": {
         "properties": {
-          "transformation_spec_digest": {"const": "sha256:487946510eceed0c3d85bf054d26f783f858dc7aae97bbbb467f94d672cb6982"},
+          "transformation_spec_digest": {"const": "sha256:099512050e0d8208c931cfaa81369ec305a87846f6573e51bdcdbb625b88c6c6"},
           "policy": {"$ref": "#/$defs/namedPolicy"},
           "data": {"$ref": "#/$defs/namedData"}
         }
@@ -148,10 +148,10 @@
         "population": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["n_bucket", "denominator_bucket"],
+          "required": ["n", "denominator"],
           "properties": {
-            "n_bucket": {"$ref": "#/$defs/bucket"},
-            "denominator_bucket": {"$ref": "#/$defs/bucket"}
+            "n": {"type": "integer", "minimum": 0},
+            "denominator": {"type": "integer", "minimum": 0}
           }
         },
         "measurements": {"$ref": "#/$defs/measurements"},
