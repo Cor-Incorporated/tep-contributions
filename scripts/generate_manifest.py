@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
-"""Generate manifest.jsonl from payloads/**.meta.json (C: single-writer rule).
+"""Generate manifest.jsonl from payloads/**.meta.json.
 
-Run on main only (CI or maintainer). PRs never touch manifest.jsonl.
+The file is derived, git-ignored, and never committed: CI runs this on every
+event and publishes the result as the `manifest` artifact. A committed copy
+would need a bot push to main, which the organization ruleset rejects
+(2026-09-04, run 33900740283).
 """
+
 from __future__ import annotations
 
 import json

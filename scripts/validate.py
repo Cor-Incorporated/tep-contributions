@@ -967,8 +967,9 @@ def _validate_named_public(data: dict, label: str) -> None:
 
 def main() -> int:
     # C (2026-08-25): PRs add payloads/<year>/<id>.json + <id>.meta.json only.
-    # manifest.jsonl is GENERATED on main by CI from the meta files — parallel
-    # PRs never conflict on a shared append target.
+    # manifest.jsonl is DERIVED from the meta files by CI and published as an
+    # artifact (2026-09-04: no longer committed — the org ruleset rejects bot
+    # pushes to main). Parallel PRs never conflict on a shared append target.
     payloads = sorted(
         p for p in Path("payloads").rglob("*.json") if not p.name.endswith(".meta.json")
     )
@@ -997,8 +998,8 @@ def main() -> int:
         if not RECEIVED_RE.match(str(row["received_at"])):
             fail(f"{meta_path}: received_at must be ISO datetime")
         manifest[row["id"]] = row
-    # stale legacy manifest.jsonl (if present) must not contain ids missing
-    # from the meta files — regeneration drift is itself a failure
+    # a locally generated manifest.jsonl (if present; it is git-ignored) must
+    # not contain ids missing from the meta files — drift is itself a failure
     legacy = Path("manifest.jsonl")
     if legacy.is_file():
         for lineno, line in enumerate(
@@ -1010,7 +1011,7 @@ def main() -> int:
                 row = _loads_strict(line)
             except ValueError as exc:
                 fail(
-                    f"manifest.jsonl:{lineno}: invalid JSON ({exc}) — regenerate on main"
+                    f"manifest.jsonl:{lineno}: invalid JSON ({exc}) — regenerate with scripts/generate_manifest.py"
                 )
                 continue
             if not isinstance(row, dict):
@@ -1018,7 +1019,7 @@ def main() -> int:
                 continue
             if row.get("id") not in manifest:
                 fail(
-                    f"manifest.jsonl:{lineno}: id {row.get('id')!r} has no payload/meta; regenerate on main"
+                    f"manifest.jsonl:{lineno}: id {row.get('id')!r} has no payload/meta; regenerate with scripts/generate_manifest.py"
                 )
 
     for f in payloads:

@@ -10,7 +10,7 @@
 2. `grift contribute --privacy aggregate|named-public --door public-pr --out .grift/contribution.json` で payload を組み、**全文を確認**
 3. このリポジトリに PR:
    - **payload ファイル**: `payloads/2026/<submission-id>.json`（`grift contribute` の出力をそのまま・手編集不可）
-   - **meta sidecar**: 同じ場所へ `<submission-id>.meta.json` を追加: `{"id":"<submission-id>","sha256":"<sha256>","received_at":"<ISO8601>","door":"pr"}`。`manifest.jsonl` は main CI の single writer が生成するため PR では編集しない
+   - **meta sidecar**: 同じ場所へ `<submission-id>.meta.json` を追加: `{"id":"<submission-id>","sha256":"<sha256>","received_at":"<ISO8601>","door":"pr"}`。`manifest.jsonl` はリポジトリに置かない。CI が毎回 meta から生成し artifact `manifest` として公開する（組織 ruleset により bot も main へ直接 push できないため、commit 方式は廃止）。ローカルで欲しければ `python scripts/generate_manifest.py`
    - クレジット希望者のみ payload に `attribution: "表示名"` を追加（任意・64文字以内・メール/URL 禁止）
    - ブランチ名: `contrib/<submission-id>`／PR タイトル: `contribution: <submission-id>`
 

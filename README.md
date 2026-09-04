@@ -43,7 +43,7 @@ grift report                                     # ① repo スコープの repo
 grift contribute --out .grift/contribution.json  # ② payload を組み・全文を確認
 # ③ payload をそのまま PR に出す:
 #    ファイル: payloads/2026/<submission-id>.json
-#    同じ場所に <id>.meta.json を追加（manifest.jsonl は main で自動生成・編集不要）: {"id":"...","sha256":"...","received_at":"...","door":"pr"}
+#    同じ場所に <id>.meta.json を追加（manifest.jsonl はリポジトリに置かず、CI が meta から生成して artifact `manifest` として公開）: {"id":"...","sha256":"...","received_at":"...","door":"pr"}
 #    attribution を付ける場合は payload の attribution フィールドに任意の表示名（任意・opt-in）
 ```
 
