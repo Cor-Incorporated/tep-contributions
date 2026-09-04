@@ -1,0 +1,537 @@
+{
+  "contribution_schema": "tep-contribution-v2",
+  "privacy_profile": "aggregate",
+  "door": "public-pr",
+  "purpose": "TEP Report 集計と参照分布 vNext",
+  "provenance_receipt_id": "receipt_h6yezmkxevoxptcd2yqgdl4df4",
+  "transformation_spec_digest": "sha256:3e26e0a71411d954e8459b8ae09b14e4b9a6dd6e0433858b5042db0760425366",
+  "policy": {
+    "access_class": "public",
+    "public_payload": true,
+    "source_replay": "unavailable_from_public_payload"
+  },
+  "data": {
+    "population": {
+      "n": 3,
+      "denominator": 4182
+    },
+    "measurements": {
+      "activity": {
+        "active_days": {
+          "kind": "observed",
+          "unit": "days",
+          "value_bucket": "100-499"
+        },
+        "active_days_13w": {
+          "kind": "observed",
+          "unit": "days",
+          "value_bucket": "20-99"
+        },
+        "commits_per_active_day": {
+          "kind": "observed",
+          "value_bucket": "20-99"
+        },
+        "commits_per_active_day_median": {
+          "kind": "observed",
+          "sample_size_bucket": "100-499",
+          "value_bucket": "5-19"
+        },
+        "repo_active_days": {
+          "kind": "observed",
+          "unit": "days",
+          "value_bucket": "100-499"
+        },
+        "repo_commits": {
+          "kind": "observed",
+          "unit": "commits",
+          "value_bucket": "2000+"
+        },
+        "repo_human_nonmerge_commits": {
+          "kind": "observed",
+          "unit": "commits",
+          "value_bucket": "2000+"
+        }
+      },
+      "attribution": {
+        "attributed_commit_count_bucket": "2000+",
+        "attribution_coverage": {
+          "kind": "observed",
+          "sample_size_bucket": "2000+",
+          "unit": "ratio",
+          "value_bucket": "90-100%"
+        },
+        "attribution_human_including_merges_bucket": "2000+",
+        "attribution_unresolved_commit_count_bucket": "0",
+        "bot": {
+          "kind": "observed",
+          "unit": "commits",
+          "value_bucket": "0"
+        },
+        "bot_count_bucket": "0",
+        "coauthored_count_bucket": "500-1999",
+        "human_commit_count_bucket": "2000+",
+        "merge_count_bucket": "500-1999",
+        "observed_actor_count_bucket": "1-4",
+        "origin_unresolved_commit_count_bucket": "0",
+        "public_join": {
+          "account_conflict_count_bucket": "0",
+          "ambiguous_bucket": "0",
+          "commit_login_count_bucket": "0",
+          "matched_bucket": "0",
+          "public_handle_actors_bucket": "1-4",
+          "unmatched_bucket": "0"
+        },
+        "repo_human_nonmerge_commits_bucket": "2000+",
+        "unresolved_commit_count_bucket": "0"
+      },
+      "context_profile": {
+        "active_days_180d": {
+          "kind": "observed",
+          "unit": "days",
+          "value_bucket": "100-499"
+        },
+        "actor_turnover": {
+          "kind": "observed"
+        },
+        "analysis_scope": "repo",
+        "collaboration_class": {
+          "kind": "observed"
+        },
+        "conventional_commit_share": {
+          "kind": "observed",
+          "unit": "ratio",
+          "value_bucket": "90-100%"
+        },
+        "days_since_last_human_commit": {
+          "kind": "observed",
+          "unit": "days",
+          "value_bucket": "0"
+        },
+        "dependency_manifests": {
+          "kind": "observed"
+        },
+        "docs_share": {
+          "kind": "observed",
+          "unit": "ratio",
+          "value_bucket": "20-30%"
+        },
+        "issue_link_density": {
+          "kind": "observed",
+          "unit": "ratio",
+          "value_bucket": "30-40%"
+        },
+        "kind": "observed",
+        "language_composition": {
+          "kind": "observed"
+        },
+        "lifecycle_stage": {
+          "kind": "observed"
+        },
+        "monorepo_markers": {
+          "kind": "observed"
+        },
+        "pr_flow_share": {
+          "kind": "observed",
+          "unit": "ratio",
+          "value_bucket": "30-40%"
+        },
+        "release_cadence": {
+          "kind": "observed",
+          "value_bucket": "100-499"
+        },
+        "repo_age_days": {
+          "kind": "observed",
+          "unit": "days",
+          "value_bucket": "100-499"
+        },
+        "resolved_human_actors": {
+          "kind": "observed",
+          "value_bucket": "1-4"
+        },
+        "scale": {
+          "active_span_days": {
+            "kind": "observed",
+            "unit": "days",
+            "value_bucket": "100-499"
+          },
+          "first_commit": {
+            "kind": "observed"
+          },
+          "human_commits": {
+            "kind": "observed",
+            "unit": "commits",
+            "value_bucket": "2000+"
+          },
+          "kind": "observed",
+          "last_commit": {
+            "kind": "observed"
+          },
+          "top_level_dirs": {
+            "kind": "observed"
+          }
+        },
+        "test_file_ratio": {
+          "kind": "observed",
+          "unit": "ratio",
+          "value_bucket": "50-60%"
+        },
+        "top_actor_share": {
+          "kind": "observed",
+          "unit": "ratio",
+          "value_bucket": "90-100%"
+        }
+      },
+      "surface_profile": {
+        "ambiguous_count_bucket": "2000+",
+        "classification_basis": "path_pattern_and_extension_heuristic",
+        "cross_surface_cochange": {
+          "kind": "observed",
+          "unit": "commit-pairs"
+        },
+        "kind": "observed",
+        "module_breadth": {
+          "kind": "observed",
+          "sample_size_bucket": "2000+",
+          "value_bucket": "20-99"
+        },
+        "population_bucket": "2000+",
+        "sample_size_bucket": "2000+",
+        "surface_commit_counts": {
+          "kind": "observed",
+          "unit": "commits",
+          "value_buckets": {
+            "backend": "500-1999",
+            "ci_cd": "100-499",
+            "config": "500-1999",
+            "data": "100-499",
+            "docs": "500-1999",
+            "frontend": "100-499",
+            "generated_vendor": "0",
+            "observability": "5-19",
+            "other": "500-1999",
+            "platform": "100-499",
+            "test": "500-1999"
+          }
+        },
+        "surface_commit_share": {
+          "kind": "observed",
+          "population_bucket": "2000+",
+          "sample_size_bucket": "2000+",
+          "unit": "ratio",
+          "value_buckets": {
+            "backend": "40-50%",
+            "ci_cd": "10-20%",
+            "config": "20-30%",
+            "data": "00-10%",
+            "docs": "20-30%",
+            "frontend": "10-20%",
+            "generated_vendor": "00-10%",
+            "observability": "00-10%",
+            "other": "30-40%",
+            "platform": "00-10%",
+            "test": "50-60%"
+          }
+        },
+        "surface_file_counts": {
+          "kind": "observed",
+          "sample_size_bucket": "2000+",
+          "unit": "file-changes",
+          "value_buckets": {
+            "backend": "2000+",
+            "ci_cd": "100-499",
+            "config": "500-1999",
+            "data": "500-1999",
+            "docs": "2000+",
+            "frontend": "500-1999",
+            "generated_vendor": "0",
+            "observability": "20-99",
+            "other": "2000+",
+            "platform": "500-1999",
+            "test": "2000+"
+          }
+        },
+        "surface_file_share": {
+          "kind": "observed",
+          "population_bucket": "2000+",
+          "sample_size_bucket": "2000+",
+          "unit": "ratio",
+          "value_buckets": {
+            "backend": "10-20%",
+            "ci_cd": "00-10%",
+            "config": "00-10%",
+            "data": "00-10%",
+            "docs": "20-30%",
+            "frontend": "00-10%",
+            "generated_vendor": "00-10%",
+            "observability": "00-10%",
+            "other": "20-30%",
+            "platform": "00-10%",
+            "test": "20-30%"
+          }
+        },
+        "surface_line_counts": {
+          "kind": "observed",
+          "sample_size_bucket": "2000+",
+          "unit": "lines",
+          "value_buckets": {
+            "backend": "2000+",
+            "ci_cd": "2000+",
+            "config": "2000+",
+            "data": "2000+",
+            "docs": "2000+",
+            "frontend": "2000+",
+            "generated_vendor": "0",
+            "observability": "500-1999",
+            "other": "2000+",
+            "platform": "2000+",
+            "test": "2000+"
+          }
+        },
+        "top_module_share": {
+          "kind": "observed",
+          "sample_size_bucket": "2000+",
+          "unit": "ratio",
+          "value_bucket": "30-40%"
+        },
+        "unclassified_count_bucket": "2000+",
+        "unit": "profile"
+      },
+      "change_rhythm": {
+        "active_days_180d": {
+          "kind": "observed",
+          "sample_size_bucket": "2000+",
+          "unit": "days",
+          "value_bucket": "100-499"
+        },
+        "burst_share_le_2d": {
+          "kind": "observed",
+          "sample_size_bucket": "2000+",
+          "unit": "ratio",
+          "value_bucket": "90-100%"
+        },
+        "history_outside_window_commit_count": {
+          "kind": "observed",
+          "unit": "commits",
+          "value_bucket": "20-99"
+        },
+        "interval_sample_size": {
+          "kind": "observed",
+          "value_bucket": "2000+"
+        },
+        "kind": "observed",
+        "long_gap_share_ge_30d": {
+          "kind": "observed",
+          "sample_size_bucket": "2000+",
+          "unit": "ratio",
+          "value_bucket": "00-10%"
+        },
+        "median_gap_days": {
+          "kind": "observed",
+          "sample_size_bucket": "2000+",
+          "unit": "days",
+          "value_bucket": "0"
+        },
+        "p90_gap_days": {
+          "kind": "observed",
+          "sample_size_bucket": "2000+",
+          "unit": "days",
+          "value_bucket": "0"
+        },
+        "sample_size_bucket": "2000+",
+        "unit": "profile",
+        "window_days_bucket": "100-499",
+        "window_population_bucket": "2000+"
+      },
+      "verification_profile": {
+        "fix_with_test_pairing": {
+          "kind": "observed",
+          "sample_size_bucket": "500-1999",
+          "unit": "ratio",
+          "value_bucket": "50-60%"
+        },
+        "kind": "observed",
+        "sample_size_bucket": "2000+",
+        "test_only_commit_count": {
+          "kind": "observed",
+          "sample_size_bucket": "2000+",
+          "unit": "commits",
+          "value_bucket": "100-499"
+        },
+        "test_touch_share": {
+          "kind": "observed",
+          "sample_size_bucket": "2000+",
+          "unit": "ratio",
+          "value_bucket": "50-60%"
+        },
+        "test_type_distribution": {
+          "kind": "observed",
+          "unit": "commits",
+          "value_buckets": {
+            "contract": "0",
+            "e2e": "100-499",
+            "integration": "5-19",
+            "unit": "500-1999",
+            "unspecified": "500-1999"
+          }
+        },
+        "unit": "profile"
+      },
+      "coordination_profile": {
+        "git": {
+          "issue_link_count": {
+            "kind": "observed",
+            "unit": "commits",
+            "value_bucket": "500-1999"
+          },
+          "issue_link_share": {
+            "count_bucket": "500-1999",
+            "kind": "observed",
+            "sample_size_bucket": "2000+",
+            "unit": "ratio",
+            "value_bucket": "30-40%"
+          },
+          "kind": "observed",
+          "merge_commit_count": {
+            "kind": "observed",
+            "unit": "commits",
+            "value_bucket": "500-1999"
+          },
+          "unit": "profile"
+        },
+        "kind": "observed",
+        "review": {
+          "kind": "not_observed"
+        },
+        "sample_size_bucket": "2000+",
+        "tracker": {
+          "kind": "not_observed"
+        },
+        "unit": "profile"
+      },
+      "event_observation": {
+        "kind": "not_observed"
+      },
+      "event_rhythm": {
+        "kind": "not_observed"
+      },
+      "tracker_lifecycle": {
+        "kind": "not_observed"
+      },
+      "experience": {
+        "kind": "not_observed"
+      },
+      "role_profile": {
+        "kind": "not_observed"
+      }
+    },
+    "coverage": {
+      "event_window": {
+        "kind": "not_observed",
+        "reason": "unregistered_reason"
+      },
+      "forge": {
+        "kind": "not_observed",
+        "provided": false,
+        "reason": "forge_export_not_provided"
+      },
+      "git": {
+        "kind": "observed",
+        "provided": true
+      },
+      "public_forge": {
+        "kind": "not_observed",
+        "reason": "public_evidence_not_provided"
+      },
+      "tracker": {
+        "kind": "not_observed",
+        "provided": false,
+        "reason": "tracker_export_not_provided"
+      },
+      "tracker_window": {
+        "kind": "not_observed",
+        "reason": "tracker_export_not_provided"
+      },
+      "window_alignment": {
+        "kind": "not_observed",
+        "reason": "event_window_not_provided"
+      }
+    },
+    "missingness": [
+      {
+        "path": "activity",
+        "kind": "suppressed",
+        "reason": "unregistered_text"
+      },
+      {
+        "path": "attribution",
+        "kind": "suppressed",
+        "reason": "unregistered_text"
+      },
+      {
+        "path": "change_rhythm",
+        "kind": "suppressed",
+        "reason": "unregistered_text"
+      },
+      {
+        "path": "context_profile",
+        "kind": "suppressed",
+        "reason": "unregistered_text"
+      },
+      {
+        "path": "coordination_profile",
+        "kind": "not_observed",
+        "reason": "forge_export_not_provided"
+      },
+      {
+        "path": "coordination_profile",
+        "kind": "not_observed",
+        "reason": "tracker_export_not_provided"
+      },
+      {
+        "path": "coordination_profile",
+        "kind": "suppressed",
+        "reason": "unregistered_text"
+      },
+      {
+        "path": "event_observation",
+        "kind": "not_observed",
+        "reason": "forge_export_not_provided"
+      },
+      {
+        "path": "event_rhythm",
+        "kind": "not_observed",
+        "reason": "forge_export_not_provided"
+      },
+      {
+        "path": "experience",
+        "kind": "not_observed",
+        "reason": "consenting_actor_required"
+      },
+      {
+        "path": "input_coverage",
+        "kind": "suppressed",
+        "reason": "unregistered_reason"
+      },
+      {
+        "path": "role_profile",
+        "kind": "not_observed",
+        "reason": "consenting_actor_required"
+      },
+      {
+        "path": "surface_profile",
+        "kind": "suppressed",
+        "reason": "unregistered_text"
+      },
+      {
+        "path": "tracker_lifecycle",
+        "kind": "not_observed",
+        "reason": "tracker_export_not_provided"
+      },
+      {
+        "path": "verification_profile",
+        "kind": "suppressed",
+        "reason": "unregistered_text"
+      }
+    ]
+  }
+}
